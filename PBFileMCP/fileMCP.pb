@@ -1,3 +1,4 @@
+; PureBasic
 ; ============================================================================
 ;  SERVEUR MCP - PureBasic (Console / Stdio) - 100 % Natif (Sans DLL / API)
 ; ============================================================================
@@ -410,153 +411,45 @@ EndProcedure
 ; Construction JSON-RPC & Catalogue MCP
 ; ---------------------------------------------------------------------------
 
-Procedure AddToolDef(ToolsArray.i, Name.s, Description.s, PropertiesObj.i, RequiredArray.i)
-  Protected ToolObj.i = AddJSONElement(ToolsArray)
-  SetJSONObject(ToolObj)
-  SetJSONString(AddJSONMember(ToolObj, "name"), Name)
-  SetJSONString(AddJSONMember(ToolObj, "description"), Description)
-
-  Protected SchemaObj.i = AddJSONMember(ToolObj, "inputSchema")
-  SetJSONObject(SchemaObj)
-  SetJSONString(AddJSONMember(SchemaObj, "type"), "object")
-
-  Protected PropsTarget.i = AddJSONMember(SchemaObj, "properties")
-  SetJSONObject(PropsTarget)
-  If PropertiesObj
-    Protected Member.i = ExamineJSONMembers(PropertiesObj)
-    While NextJSONMember(Member)
-      Protected NewMember.i = AddJSONMember(PropsTarget, JSONMemberKey(Member))
-      SetJSONObject(NewMember)
-      SetJSONString(AddJSONMember(NewMember, "type"), GetJSONString(GetJSONMember(JSONMemberValue(Member), "type")))
-      SetJSONString(AddJSONMember(NewMember, "description"), GetJSONString(GetJSONMember(JSONMemberValue(Member), "description")))
-    Wend
-  EndIf
-
-  Protected ReqTarget.i = AddJSONMember(SchemaObj, "required")
-  SetJSONArray(ReqTarget)
-  If RequiredArray
-    Protected i.i, Total.i = JSONArraySize(RequiredArray)
-    For i = 0 To Total - 1
-      SetJSONString(AddJSONElement(ReqTarget), GetJSONString(GetJSONElement(RequiredArray, i)))
-    Next
-  EndIf
-EndProcedure
 
 Procedure.i BuildToolsCatalog()
+  ; Catalogue des outils MCP genere a partir de chaines JSON statiques
   Protected RootJSON.i = CreateJSON(#PB_Any)
   Protected RootVal.i = SetJSONObject(JSONValue(RootJSON))
   Protected ToolsArr.i = AddJSONMember(RootVal, "tools")
   SetJSONArray(ToolsArr)
 
-  Protected TmpProps.i, TmpReq.i, P.i
+  Protected Def.s
 
-  ; 1. list_files
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string")
-  SetJSONString(AddJSONMember(P, "description"), "Chemin du repertoire")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "list_files", "Lister le contenu d'un repertoire (confine a la racine autorisee)", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~list_files~,~description~:~Lister le contenu d un repertoire (confine a la racine autorisee)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin du repertoire~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 2. read_file
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string")
-  SetJSONString(AddJSONMember(P, "description"), "Chemin du fichier")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "read_file", "Lire un fichier texte (tronque au-dela de 20000 octets)", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~read_file~,~description~:~Lire un fichier texte (tronque au-dela de 20000 octets)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin du fichier~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 3. read_file_lines
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin")
-  P = AddJSONMember(JSONValue(TmpProps), "startLine") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "integer") : SetJSONString(AddJSONMember(P, "description"), "Ligne de depart (defaut:1)")
-  P = AddJSONMember(JSONValue(TmpProps), "maxLines") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "integer") : SetJSONString(AddJSONMember(P, "description"), "Nombre de lignes (defaut:50)")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "read_file_lines", "Lire une plage de lignes (fichier limite a 5 Mo)", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~read_file_lines~,~description~:~Lire une plage de lignes (fichier limite a 5 Mo)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~},~startLine~:{~type~:~integer~,~description~:~Ligne de depart (defaut:1)~},~maxLines~:{~type~:~integer~,~description~:~Nombre de lignes (defaut:50)~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 4. write_file
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin")
-  P = AddJSONMember(JSONValue(TmpProps), "content") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Contenu")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "content")
-  AddToolDef(ToolsArr, "write_file", "Ecrire/creer un fichier texte", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~write_file~,~description~:~Ecrire/creer un fichier texte~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~},~content~:{~type~:~string~,~description~:~Contenu~}},~required~:[~path~,~content~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 5. create_directory
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "create_directory", "Creer un repertoire", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~create_directory~,~description~:~Creer un repertoire~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 6. delete_file
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou dossier vide", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~delete_file~,~description~:~Supprimer un fichier ou dossier vide~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 7. move_file
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "oldPath") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin source")
-  P = AddJSONMember(JSONValue(TmpProps), "newPath") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin destination")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "oldPath")
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "newPath")
-  AddToolDef(ToolsArr, "move_file", "Deplacer ou renommer un fichier", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~move_file~,~description~:~Deplacer ou renommer un fichier~,~inputSchema~:{~type~:~object~,~properties~:{~oldPath~:{~type~:~string~,~description~:~Chemin source~},~newPath~:{~type~:~string~,~description~:~Chemin destination~}},~required~:[~oldPath~,~newPath~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 8. get_file_info
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Chemin")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  AddToolDef(ToolsArr, "get_file_info", "Infos detaillees fichier/dossier", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~get_file_info~,~description~:~Infos detaillees fichier/dossier~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 9. search_files
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "path") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Repertoire de depart")
-  P = AddJSONMember(JSONValue(TmpProps), "pattern") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Texte recherche")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "path")
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "pattern")
-  AddToolDef(ToolsArr, "search_files", "Rechercher du texte (recursif)", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~search_files~,~description~:~Rechercher du texte (recursif)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Repertoire de depart~},~pattern~:{~type~:~string~,~description~:~Texte recherche~}},~required~:[~path~,~pattern~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
-  ; 10. change_root
-  TmpProps = CreateJSON(#PB_Any) : SetJSONObject(JSONValue(TmpProps))
-  P = AddJSONMember(JSONValue(TmpProps), "newRoot") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Nouveau repertoire racine")
-  P = AddJSONMember(JSONValue(TmpProps), "secret") : SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string") : SetJSONString(AddJSONMember(P, "description"), "Mot de passe MCP_ROOT_SECRET")
-  TmpReq = CreateJSON(#PB_Any) : SetJSONArray(JSONValue(TmpReq))
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "newRoot")
-  SetJSONString(AddJSONElement(JSONValue(TmpReq)), "secret")
-  AddToolDef(ToolsArr, "change_root", "CHANGER LA ZONE AUTORISEE", JSONValue(TmpProps), JSONValue(TmpReq))
-  FreeJSON(TmpProps) : FreeJSON(TmpReq)
+  Def = '{~name~:~change_root~,~description~:~CHANGER LA ZONE AUTORISEE~,~inputSchema~:{~type~:~object~,~properties~:{~newRoot~:{~type~:~string~,~description~:~Nouveau repertoire racine~},~secret~:{~type~:~string~,~description~:~Mot de passe MCP_ROOT_SECRET~}},~required~:[~newRoot~,~secret~]}}}'
+  ParseJSON(AddJSONElement(ToolsArr), Def)
 
   ProcedureReturn RootJSON
 EndProcedure
@@ -654,9 +547,12 @@ Procedure ProcessRequest(Line.s)
 
   ; Cas particulier tools/list : émission directe du catalogue composé
   If Method = "tools/list"
+    ; Reponse envoyee par morceaux pour eviter d'imprimer un unique bloc
+    ; memoire trop important (bug connu du backend C sur les grosses sorties)
     Protected CatalogJSON.i = BuildToolsCatalog()
-    Protected CatalogString.s = ComposeJSON(CatalogJSON)
-    FreeJSON(CatalogJSON)
+    Protected ToolsJsonArray.i = GetJSONMember(JSONValue(CatalogJSON), "tools")
+    Protected ItemsCount.i = JSONArraySize(ToolsJsonArray)
+    Protected i.i
 
     Protected IdValStr.s = "null"
     If IdMember
@@ -667,9 +563,17 @@ Procedure ProcessRequest(Line.s)
       EndIf
     EndIf
 
-    PrintN("{" + #DQUOTE$ + "jsonrpc" + #DQUOTE$ + ":" + #DQUOTE$ + "2.0" + #DQUOTE$ + "," + 
-           #DQUOTE$ + "id" + #DQUOTE$ + ":" + IdValStr + "," + 
-           #DQUOTE$ + "result" + #DQUOTE$ + ":" + CatalogString + "}")
+    PrintN("{" + #DQUOTE$ + "jsonrpc" + #DQUOTE$ + ":" + #DQUOTE$ + "2.0" + #DQUOTE$ + "," +
+           #DQUOTE$ + "id" + #DQUOTE$ + ":" + IdValStr + "," +
+           #DQUOTE$ + "result" + #DQUOTE$ + ":{ " + #DQUOTE$ + "tools" + #DQUOTE$ + ": [")
+    For i = 0 To ItemsCount - 1
+      Print(ComposeJSON(GetJSONElement(ToolsJsonArray, i)))
+      If i < ItemsCount - 1
+        Print(", ")
+      EndIf
+    Next
+    PrintN("]}}")
+    FreeJSON(CatalogJSON)
     FreeJSON(ReqJSON)
     ProcedureReturn
   EndIf
