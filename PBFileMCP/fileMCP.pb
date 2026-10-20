@@ -412,44 +412,67 @@ EndProcedure
 ; ---------------------------------------------------------------------------
 
 
+Procedure AddProp(Obj.i, Key.s, Type.s, Descr.s)
+  Protected P.i = AddJSONMember(Obj, Key)
+  SetJSONObject(P)
+  SetJSONString(AddJSONMember(P, "type"), Type)
+  SetJSONString(AddJSONMember(P, "description"), Descr)
+EndProcedure
+
+Procedure AddReq(Arr.i, Key.s)
+  SetJSONString(AddJSONElement(Arr), Key)
+EndProcedure
+
+Procedure ToolDef(ToolsArr.i, Name.s, Descr.s, PropsSpec.s, ReqSpec.s)
+  ; Construit la definition d'un outil MCP. PropsSpec = proprietes separes par
+  ; des ';', chaque entree etant 'cle|type|description'. ReqSpec = cles
+  ; requises separees par des ';'. Tout est cree nativement dans le document
+  ; cible (pas de valeurs partagees -> pas de segfault).
+  Protected ToolObj.i = AddJSONElement(ToolsArr)
+  SetJSONObject(ToolObj)
+  SetJSONString(AddJSONMember(ToolObj, "name"), Name)
+  SetJSONString(AddJSONMember(ToolObj, "description"), Descr)
+  Protected SchemaObj.i = AddJSONMember(ToolObj, "inputSchema")
+  SetJSONObject(SchemaObj)
+  SetJSONString(AddJSONMember(SchemaObj, "type"), "object")
+  Protected PropsObj.i = AddJSONMember(SchemaObj, "properties")
+  SetJSONObject(PropsObj)
+  Protected ReqArr.i = AddJSONMember(SchemaObj, "required")
+  SetJSONArray(ReqArr)
+
+  Protected i.i, n.i = CountString(PropsSpec, ";") + 1, Entry.s, K.s, T.s, D.s
+  For i = 1 To n
+    Entry = Trim(StringField(PropsSpec, i, ";"))
+    If Entry <> ""
+      K = Trim(StringField(Entry, 1, "|"))
+      T = Trim(StringField(Entry, 2, "|"))
+      D = Trim(StringField(Entry, 3, "|"))
+      AddProp(PropsObj, K, T, D)
+    EndIf
+  Next
+  n = CountString(ReqSpec, ";") + 1
+  For i = 1 To n
+    Entry = Trim(StringField(ReqSpec, i, ";"))
+    If Entry <> "" : AddReq(ReqArr, Entry) : EndIf
+  Next
+EndProcedure
+
 Procedure.i BuildToolsCatalog()
-  ; Catalogue des outils MCP genere a partir de chaines JSON statiques
   Protected RootJSON.i = CreateJSON(#PB_Any)
   Protected RootVal.i = SetJSONObject(JSONValue(RootJSON))
   Protected ToolsArr.i = AddJSONMember(RootVal, "tools")
   SetJSONArray(ToolsArr)
 
-  Protected Def.s
-
-  Def = '{~name~:~list_files~,~description~:~Lister le contenu d un repertoire (confine a la racine autorisee)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin du repertoire~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~read_file~,~description~:~Lire un fichier texte (tronque au-dela de 20000 octets)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin du fichier~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~read_file_lines~,~description~:~Lire une plage de lignes (fichier limite a 5 Mo)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~},~startLine~:{~type~:~integer~,~description~:~Ligne de depart (defaut:1)~},~maxLines~:{~type~:~integer~,~description~:~Nombre de lignes (defaut:50)~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~write_file~,~description~:~Ecrire/creer un fichier texte~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~},~content~:{~type~:~string~,~description~:~Contenu~}},~required~:[~path~,~content~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~create_directory~,~description~:~Creer un repertoire~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~delete_file~,~description~:~Supprimer un fichier ou dossier vide~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~move_file~,~description~:~Deplacer ou renommer un fichier~,~inputSchema~:{~type~:~object~,~properties~:{~oldPath~:{~type~:~string~,~description~:~Chemin source~},~newPath~:{~type~:~string~,~description~:~Chemin destination~}},~required~:[~oldPath~,~newPath~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~get_file_info~,~description~:~Infos detaillees fichier/dossier~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Chemin~}},~required~:[~path~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~search_files~,~description~:~Rechercher du texte (recursif)~,~inputSchema~:{~type~:~object~,~properties~:{~path~:{~type~:~string~,~description~:~Repertoire de depart~},~pattern~:{~type~:~string~,~description~:~Texte recherche~}},~required~:[~path~,~pattern~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
-
-  Def = '{~name~:~change_root~,~description~:~CHANGER LA ZONE AUTORISEE~,~inputSchema~:{~type~:~object~,~properties~:{~newRoot~:{~type~:~string~,~description~:~Nouveau repertoire racine~},~secret~:{~type~:~string~,~description~:~Mot de passe MCP_ROOT_SECRET~}},~required~:[~newRoot~,~secret~]}}}'
-  ParseJSON(AddJSONElement(ToolsArr), Def)
+  ToolDef(ToolsArr, "list_files", "Lister le contenu d'un repertoire (confine a la racine autorisee)", "path|string|Chemin du repertoire", "path")
+  ToolDef(ToolsArr, "read_file", "Lire un fichier texte (tronque au-dela de 20000 octets)", "path|string|Chemin du fichier", "path")
+  ToolDef(ToolsArr, "read_file_lines", "Lire une plage de lignes (fichier limite a 5 Mo)", "path|string|Chemin;startLine|integer|Ligne de depart (defaut:1);maxLines|integer|Nombre de lignes (defaut:50)", "path")
+  ToolDef(ToolsArr, "write_file", "Ecrire/creer un fichier texte", "path|string|Chemin;content|string|Contenu", "path;content")
+  ToolDef(ToolsArr, "create_directory", "Creer un repertoire", "path|string|Chemin", "path")
+  ToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou dossier vide", "path|string|Chemin", "path")
+  ToolDef(ToolsArr, "move_file", "Deplacer ou renommer un fichier", "oldPath|string|Chemin source;newPath|string|Chemin destination", "oldPath;newPath")
+  ToolDef(ToolsArr, "get_file_info", "Infos detaillees fichier/dossier", "path|string|Chemin", "path")
+  ToolDef(ToolsArr, "search_files", "Rechercher du texte (recursif)", "path|string|Repertoire de depart;pattern|string|Texte recherche", "path;pattern")
+  ToolDef(ToolsArr, "change_root", "CHANGER LA ZONE AUTORISEE", "newRoot|string|Nouveau repertoire racine;secret|string|Mot de passe MCP_ROOT_SECRET", "newRoot;secret")
 
   ProcedureReturn RootJSON
 EndProcedure
@@ -547,32 +570,21 @@ Procedure ProcessRequest(Line.s)
 
   ; Cas particulier tools/list : émission directe du catalogue composé
   If Method = "tools/list"
-    ; Reponse envoyee par morceaux pour eviter d'imprimer un unique bloc
-    ; memoire trop important (bug connu du backend C sur les grosses sorties)
+    ; Reponse conforme JSON-RPC : le catalogue est compose en un seul objet
+    ; "result" puis envoye sur une ligne (protocole stdio delimite par \n).
     Protected CatalogJSON.i = BuildToolsCatalog()
-    Protected ToolsJsonArray.i = GetJSONMember(JSONValue(CatalogJSON), "tools")
-    Protected ItemsCount.i = JSONArraySize(ToolsJsonArray)
-    Protected i.i
 
     Protected IdValStr.s = "null"
     If IdMember
       If JSONType(IdMember) = #PB_JSON_String
-        IdValStr = #DQUOTE$ + GetJSONString(IdMember) + #DQUOTE$
+        IdValStr = Chr(34) + GetJSONString(IdMember) + Chr(34)
       ElseIf JSONType(IdMember) = #PB_JSON_Number
         IdValStr = Str(GetJSONInteger(IdMember))
       EndIf
     EndIf
 
-    PrintN("{" + #DQUOTE$ + "jsonrpc" + #DQUOTE$ + ":" + #DQUOTE$ + "2.0" + #DQUOTE$ + "," +
-           #DQUOTE$ + "id" + #DQUOTE$ + ":" + IdValStr + "," +
-           #DQUOTE$ + "result" + #DQUOTE$ + ":{ " + #DQUOTE$ + "tools" + #DQUOTE$ + ": [")
-    For i = 0 To ItemsCount - 1
-      Print(ComposeJSON(GetJSONElement(ToolsJsonArray, i)))
-      If i < ItemsCount - 1
-        Print(", ")
-      EndIf
-    Next
-    PrintN("]}}")
+    Protected Body.s = ComposeJSON(CatalogJSON)
+    PrintN(Chr(123) + Chr(34) + "jsonrpc" + Chr(34) + ":" + Chr(34) + "2.0" + Chr(34) + "," + Chr(34) + "id" + Chr(34) + ":" + IdValStr + "," + Chr(34) + "result" + Chr(34) + ":" + Body + Chr(125))
     FreeJSON(CatalogJSON)
     FreeJSON(ReqJSON)
     ProcedureReturn
