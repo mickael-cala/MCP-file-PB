@@ -1,1 +1,18 @@
+# Sauvegardes et fichiers temporaires
 *.bak
+*~
+
+# Répertoire de compilation (généré par build.bat / build.sh)
+build/
+
+# Exécutables compilés (publier via GitHub Releases plutôt que dans git)
+*.exe
+src/fileMCP
+src/filemcpserver.exe
+
+# Fichiers de test locaux
+src/test.txt
+
+# Python (harnais de tests)
+__pycache__/
+*.pyc

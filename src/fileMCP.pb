@@ -10,13 +10,31 @@ EnableExplicit
 
 ; ---------------------------------------------------------------------------
 ; Couche E/S stdio multi-plateforme (Windows / Linux / macOS)
-;   - Lecture stdin : read_() sur le descripteur 0 (fiable en mode pipe,
-;     gere proprement l'EOF sur les 3 OS ; Input() est banni car non fiable).
+;   - Lecture stdin : fiable en mode pipe, gere proprement l'EOF sur les
+;     3 OS ; Input() est banni car non fiable.
 ;   - Ecriture stdout :
-;       * Windows -> WriteFile_(GetStdHandle_(#STD_INPUT_HANDLE... OUTPUT))
-;                    + FlushFileBuffers_ (mode pipe/stdio MCP)
+;       * Windows -> WriteFile(GetStdHandle(STD_OUTPUT_HANDLE))
+;                    + FlushFileBuffers (mode pipe/stdio MCP)
 ;       * Linux/macOS -> write_() sur le descripteur 1 + fflush_(0)
 ; ---------------------------------------------------------------------------
+
+CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+  #C_STD_INPUT_HANDLE  = -10
+  #C_STD_OUTPUT_HANDLE = -11
+
+  ; Chargement dynamique de kernel32 : les noms ReadFile/WriteFile entrent
+  ; en conflit avec des commandes PureBasic, on passe par PrototypeC.
+  PrototypeC protoGetStdHandle(nStdHandle.i)
+  PrototypeC protoReadFile(hFile.i, *lpBuffer, nNumberOfBytesToRead.l, *lpNumberOfBytesRead, *lpOverlapped)
+  PrototypeC protoWriteFile(hFile.i, *lpBuffer, nNumberOfBytesToWrite.l, *lpNumberOfBytesWritten, *lpOverlapped)
+  PrototypeC protoFlushFileBuffers(hFile.i)
+
+  Global hKernel32.i = OpenLibrary(#PB_Any, "kernel32.dll")
+  Global Std_GetHandle.protoGetStdHandle         = GetFunction(hKernel32, "GetStdHandle")
+  Global Std_ReadFile.protoReadFile              = GetFunction(hKernel32, "ReadFile")
+  Global Std_WriteFile.protoWriteFile            = GetFunction(hKernel32, "WriteFile")
+  Global Std_FlushBuffers.protoFlushFileBuffers  = GetFunction(hKernel32, "FlushFileBuffers")
+CompilerEndIf
 
 Procedure SendRawLine(Text.s)
   Protected OutText.s = Text + #LF$
@@ -26,8 +44,15 @@ Procedure SendRawLine(Text.s)
   Protected *Mem = AllocateMemory(Size)
   If *Mem
     PokeS(*Mem, OutText, -1, #PB_UTF8 | #PB_String_NoZero)
-    Protected Written.i = write_(1, *Mem, Size)
-    fflush_(0)
+    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+      Protected hOut.i = Std_GetHandle(#C_STD_OUTPUT_HANDLE)
+      Protected WrittenLow.l = 0
+      Std_WriteFile(hOut, *Mem, Size, @WrittenLow, #Null)
+      Std_FlushBuffers(hOut)
+    CompilerElse
+      Protected Written.i = write_(1, *Mem, Size)
+      fflush_(0)
+    CompilerEndIf
     FreeMemory(*Mem)
   EndIf
 EndProcedure
@@ -688,7 +713,7 @@ Procedure ProcessRequest(Line.s)
       If OutputStr = "ACCES_REFUSE"
         OutputStr = "Erreur : Acces refuse en dehors de la zone autorisee."
         IsErr = #True
-      ElseIf FindString(OutputStr, "Erreur") = 1 Or FindString(OutputStr, "Impossible") = 1 Or FindString(OutputStr, "Echec") = 1
+      ElseIf FindString(OutputStr, "Erreur") = 1 Or FindString(OutputStr, "Impossible") = 1 Or FindString(OutputStr, "Echec") = 1 Or FindString(OutputStr, "introuvable") > 0 Or FindString(OutputStr, "refusee") > 0 Or FindString(OutputStr, "depasse") > 0
         IsErr = #True
       EndIf
 
@@ -703,7 +728,8 @@ Procedure ProcessRequest(Line.s)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Lecture stdin fiable en mode pipe (read_() sur le descripteur 0)
+; Lecture stdin fiable en mode pipe (Windows : ReadFile sur le handle stdin,
+; Linux/macOS : read_() sur le descripteur 0)
 ; ---------------------------------------------------------------------------
 
 Global G_InBufSize.i   = 65536
@@ -714,7 +740,16 @@ Global G_EOF.i         = #False
 
 Procedure.i FillInputBuffer()
   If G_InPos >= G_InDataLen
-    G_InDataLen = read_(0, *G_InBuf, G_InBufSize)
+    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+      Protected ReadLow.l = 0
+      If Std_ReadFile(Std_GetHandle(#C_STD_INPUT_HANDLE), *G_InBuf, G_InBufSize, @ReadLow, #Null)
+        G_InDataLen = ReadLow
+      Else
+        G_InDataLen = 0
+      EndIf
+    CompilerElse
+      G_InDataLen = read_(0, *G_InBuf, G_InBufSize)
+    CompilerEndIf
     G_InPos = 0
     If G_InDataLen <= 0
       G_EOF = #True
@@ -725,9 +760,9 @@ Procedure.i FillInputBuffer()
 EndProcedure
 
 Procedure.s ReadStdinLine()
-  ; Retourne #Null sur EOF reel (fin de flux stdin)
+  ; Retourne "" sur EOF reel (fin de flux stdin) ; G_EOF est positionne
   If Not FillInputBuffer()
-    ProcedureReturn #Null
+    ProcedureReturn ""
   EndIf
 
   Protected Start.i = G_InPos
@@ -788,13 +823,20 @@ If G_AllowedRoot = ""
 EndIf
 G_AllowedRoot = NormalizePath(G_AllowedRoot)
 
+CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+  ; Verifier que la couche E/S stdio (kernel32) est bien chargee
+  If hKernel32 = 0 Or Std_GetHandle = 0 Or Std_ReadFile = 0 Or Std_WriteFile = 0
+    End 1
+  EndIf
+CompilerEndIf
+
 G_RootSecret = GetEnvironmentVariable("MCP_ROOT_SECRET")
 
 Define Line.s
 
 While #True
   Line = ReadStdinLine()
-  If Line = #Null
+  If Line = "" And G_EOF
     Break                      ; EOF stdin -> sortie propre du serveur
   EndIf
   Line = Trim(Line)
