@@ -8,6 +8,31 @@
 
 EnableExplicit
 
+; ---------------------------------------------------------------------------
+; Couche E/S stdio multi-plateforme (Windows / Linux / macOS)
+;   - Lecture stdin : read_() sur le descripteur 0 (fiable en mode pipe,
+;     gere proprement l'EOF sur les 3 OS ; Input() est banni car non fiable).
+;   - Ecriture stdout :
+;       * Windows -> WriteFile_(GetStdHandle_(#STD_INPUT_HANDLE... OUTPUT))
+;                    + FlushFileBuffers_ (mode pipe/stdio MCP)
+;       * Linux/macOS -> write_() sur le descripteur 1 + fflush_(0)
+; ---------------------------------------------------------------------------
+
+Procedure SendRawLine(Text.s)
+  Protected OutText.s = Text + #LF$
+  Protected Size.i = StringByteLength(OutText, #PB_UTF8)
+  If Size = 0 : ProcedureReturn : EndIf
+
+  Protected *Mem = AllocateMemory(Size)
+  If *Mem
+    PokeS(*Mem, OutText, -1, #PB_UTF8 | #PB_String_NoZero)
+    Protected Written.i = write_(1, *Mem, Size)
+    fflush_(0)
+    FreeMemory(*Mem)
+  EndIf
+EndProcedure
+
+
 Global G_AllowedRoot.s
 Global G_RootSecret.s
 
@@ -479,7 +504,7 @@ EndProcedure
 
 Procedure SendResponse(RespJSON.i)
   Protected Out.s = ComposeJSON(RespJSON)
-  PrintN(Out)
+  SendRawLine(Out)
   FreeJSON(RespJSON)
 EndProcedure
 
@@ -584,7 +609,7 @@ Procedure ProcessRequest(Line.s)
     EndIf
 
     Protected Body.s = ComposeJSON(CatalogJSON)
-    PrintN(Chr(123) + Chr(34) + "jsonrpc" + Chr(34) + ":" + Chr(34) + "2.0" + Chr(34) + "," + Chr(34) + "id" + Chr(34) + ":" + IdValStr + "," + Chr(34) + "result" + Chr(34) + ":" + Body + Chr(125))
+    SendRawLine(Chr(123) + Chr(34) + "jsonrpc" + Chr(34) + ":" + Chr(34) + "2.0" + Chr(34) + "," + Chr(34) + "id" + Chr(34) + ":" + IdValStr + "," + Chr(34) + "result" + Chr(34) + ":" + Body + Chr(125))
     FreeJSON(CatalogJSON)
     FreeJSON(ReqJSON)
     ProcedureReturn
@@ -678,30 +703,14 @@ Procedure ProcessRequest(Line.s)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Boucle Principale
+; Lecture stdin fiable en mode pipe (read_() sur le descripteur 0)
 ; ---------------------------------------------------------------------------
 
-OpenConsole()
-
-; Initialisation des variables d'environnement
-G_AllowedRoot = GetEnvironmentVariable("MCP_ROOT")
-If G_AllowedRoot = ""
-  G_AllowedRoot = GetCurrentDirectory()
-EndIf
-G_AllowedRoot = NormalizePath(G_AllowedRoot)
-
-G_RootSecret = GetEnvironmentVariable("MCP_ROOT_SECRET")
-
-Global Line.s = ""
-
-; Remplace Input() (non fiable en mode pipe sur Linux : renvoie "" a l'EOF,
-; ce qui provoque une boucle infinie de "Parse error").
-; Lecture directe via read() sur le fd 0, avec buffer interne.
-Global G_InBufSize.i = 65536
-Global *G_InBuf = AllocateMemory(G_InBufSize)
-Global G_InDataLen.i = 0   ; octets valides dans le buffer
-Global G_InPos.i = 0       ; position de lecture courante
-Global G_EOF.i = #False
+Global G_InBufSize.i   = 65536
+Global *G_InBuf        = AllocateMemory(G_InBufSize)
+Global G_InDataLen.i   = 0     ; octets valides dans le buffer
+Global G_InPos.i       = 0     ; position de lecture courante
+Global G_EOF.i         = #False
 
 Procedure.i FillInputBuffer()
   If G_InPos >= G_InDataLen
@@ -716,15 +725,15 @@ Procedure.i FillInputBuffer()
 EndProcedure
 
 Procedure.s ReadStdinLine()
+  ; Retourne #Null sur EOF reel (fin de flux stdin)
   If Not FillInputBuffer()
-    ProcedureReturn #Null     ; EOF reel -> signale la fin
+    ProcedureReturn #Null
   EndIf
 
   Protected Start.i = G_InPos
   Protected Found.i = #False
 
   While #True
-    ; Chercher \n dans la portion restante du buffer
     Protected i.i
     For i = G_InPos To G_InDataLen - 1
       If PeekB(*G_InBuf + i) = $0A
@@ -754,7 +763,7 @@ Procedure.s ReadStdinLine()
       Break
     EndIf
 
-    ; Guard anti-buffer-debordement : ligne trop longue -> on tronque
+    ; Guard anti-debordement : ligne trop longue -> on tronque
     If G_InDataLen >= G_InBufSize
       G_InPos = G_InDataLen
       Break
@@ -769,10 +778,24 @@ Procedure.s ReadStdinLine()
   ProcedureReturn PeekS(*G_InBuf + Start, Length, #PB_UTF8 | #PB_ByteLength)
 EndProcedure
 
+; ---------------------------------------------------------------------------
+; Boucle Principale
+; ---------------------------------------------------------------------------
+
+G_AllowedRoot = GetEnvironmentVariable("MCP_ROOT")
+If G_AllowedRoot = ""
+  G_AllowedRoot = GetCurrentDirectory()
+EndIf
+G_AllowedRoot = NormalizePath(G_AllowedRoot)
+
+G_RootSecret = GetEnvironmentVariable("MCP_ROOT_SECRET")
+
+Define Line.s
+
 While #True
   Line = ReadStdinLine()
   If Line = #Null
-    Break                      ; EOF stdin -> sortie propre
+    Break                      ; EOF stdin -> sortie propre du serveur
   EndIf
   Line = Trim(Line)
   If Line <> ""
@@ -780,5 +803,4 @@ While #True
   EndIf
 Wend
 
-CloseConsole()
 End
