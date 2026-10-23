@@ -103,6 +103,16 @@ clean.bat / clean.sh      # Suppression des artefacts de compilation
 tests/test_mcp.py         # Tests fonctionnels (JSON-RPC sur stdio)
 ```
 
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) — journal des versions
+- [ROADMAP.md](ROADMAP.md) — feuille de route
+- [ERRATA.md](ERRATA.md) — limitations et problèmes connus
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribuer (conventions, tests)
+- [SECURITY.md](SECURITY.md) — signalement de vulnérabilités, modèle de sécurité
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — code de conduite
+- [AGENTS.md](AGENTS.md) — instructions pour les agents IA
+
 ## Licence
 
 [MIT](LICENSE)
