@@ -694,12 +694,89 @@ G_RootSecret = GetEnvironmentVariable("MCP_ROOT_SECRET")
 
 Global Line.s = ""
 
+; Remplace Input() (non fiable en mode pipe sur Linux : renvoie "" a l'EOF,
+; ce qui provoque une boucle infinie de "Parse error").
+; Lecture directe via read() sur le fd 0, avec buffer interne.
+Global G_InBufSize.i = 65536
+Global *G_InBuf = AllocateMemory(G_InBufSize)
+Global G_InDataLen.i = 0   ; octets valides dans le buffer
+Global G_InPos.i = 0       ; position de lecture courante
+Global G_EOF.i = #False
+
+Procedure.i FillInputBuffer()
+  If G_InPos >= G_InDataLen
+    G_InDataLen = read_(0, *G_InBuf, G_InBufSize)
+    G_InPos = 0
+    If G_InDataLen <= 0
+      G_EOF = #True
+      ProcedureReturn #False
+    EndIf
+  EndIf
+  ProcedureReturn #True
+EndProcedure
+
+Procedure.s ReadStdinLine()
+  If Not FillInputBuffer()
+    ProcedureReturn #Null     ; EOF reel -> signale la fin
+  EndIf
+
+  Protected Start.i = G_InPos
+  Protected Found.i = #False
+
+  While #True
+    ; Chercher \n dans la portion restante du buffer
+    Protected i.i
+    For i = G_InPos To G_InDataLen - 1
+      If PeekB(*G_InBuf + i) = $0A
+        G_InPos = i + 1
+        Found = #True
+        Break
+      EndIf
+    Next
+
+    If Found
+      Break
+    EndIf
+
+    ; Pas de \n trouve : garder le reste, re-remplir
+    Protected Remaining.i = G_InDataLen - G_InPos
+    If Remaining > 0
+      MoveMemory(*G_InBuf + G_InPos, *G_InBuf, Remaining)
+    EndIf
+    G_InDataLen = Remaining
+    G_InPos = Remaining
+
+    If Not FillInputBuffer()
+      ; EOF sans newline final -> retourner ce qui reste
+      If G_InDataLen > G_InPos
+        G_InPos = G_InDataLen
+      EndIf
+      Break
+    EndIf
+
+    ; Guard anti-buffer-debordement : ligne trop longue -> on tronque
+    If G_InDataLen >= G_InBufSize
+      G_InPos = G_InDataLen
+      Break
+    EndIf
+  Wend
+
+  Protected Length.i = G_InPos - 1 - Start
+  If Length < 0 : Length = 0 : EndIf
+  If Length > 0 And PeekB(*G_InBuf + Start + Length - 1) = $0D
+    Length - 1                 ; retirer un \r eventuel (CRLF)
+  EndIf
+  ProcedureReturn PeekS(*G_InBuf + Start, Length, #PB_UTF8 | #PB_ByteLength)
+EndProcedure
+
 While #True
-  Line = Input()
+  Line = ReadStdinLine()
+  If Line = #Null
+    Break                      ; EOF stdin -> sortie propre
+  EndIf
+  Line = Trim(Line)
   If Line <> ""
-    ProcessRequest(Trim(Line))
-  Else
-    Delay(5)
+    ProcessRequest(Line)
   EndIf
 Wend
 
