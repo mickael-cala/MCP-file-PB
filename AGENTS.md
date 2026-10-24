@@ -1,65 +1,174 @@
 # AGENTS.md — Instructions pour les agents IA
 
-Ce fichier guide les agents de codage (Claude Code, Kimi Code, Copilot…)
-qui travaillent sur ce dépôt.
+Ce fichier guide les agents de codage (Kimi Code, Claude Code, Copilot…) qui
+travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
+
+## Reprise du développement (bootstrap)
+
+1. **Lire l'état du plan** : [PLAN.md](PLAN.md) (phases 0→6, statut et
+   livrables) et [ROADMAP.md](ROADMAP.md) (suite).
+2. **Vérifier l'environnement** :
+   - PureBasic 6.x (testé avec 6.41) — `pbcompiler` cherché via `PBCOMPILER`,
+     `C:\Program Files\PureBasic\Compilers\pbcompiler.exe`,
+     `C:\PureBasic\Compilers\pbcompiler.exe`, puis le `PATH` ;
+   - Python 3 (tests d'intégration uniquement, aucune dépendance externe) ;
+   - `git` dans le PATH (serveur `gitMCP` et workflow de commit).
+3. **Synchroniser et vérifier la base** :
+   ```bash
+   git pull
+   build.bat                  # ou ./build.sh : compile les 8 serveurs
+   run_all.bat                # ou ./run_all.sh : unitaires + intégration + rapport
+   ```
+   Attendu : **9/9 étapes**, **177 tests unitaires** (24+33+37+19+24+40) et
+   **100/100 tests d'intégration**. Si ce n'est pas le cas, corriger avant
+   toute nouvelle fonctionnalité.
+4. **Choisir la suite** : Phase 6 (robustesse/performances) est la prochaine
+   étape du plan ; sinon, voir ROADMAP.md. Ne jamais démarrer une phase sans
+   avoir vert `run_all`.
+
+## Règle absolue : documentation synchronisée AVANT chaque commit
+
+Aucun commit ne doit partir sans que **tous les fichiers `.md` concernés**
+soient à jour. Avant `git commit`, passer cette checklist :
+
+| Fichier | À mettre à jour quand… |
+|---|---|
+| `README.md` | nouvel outil, nouvelle variable d'environnement, changement de build/tests, nouveau serveur, compteurs de tests |
+| `PLAN.md` | début/fin de phase, changement de statut, nouvel écart au plan |
+| `CHANGELOG.md` | **tout changement notable** (ajout/correction/sécurité) sous `## [Non publié]` avec le détail des fichiers |
+| `ROADMAP.md` | ce qui est terminé et ce qui devient prioritaire |
+| `ERRATA.md` | limitation, bug connu, résultat des tests de référence |
+| `AGENTS.md` | changement d'architecture, de commandes, de conventions, de pièges |
+| `CONTRIBUTING.md` | conventions, workflow de tests, périmètre des contributions |
+| `SECURITY.md` | nouvelle surface d'attaque, nouveau secret, nouvelle protection |
+| `docs`/`.github/*.md` | modèles d'issues/PR, compteurs cités |
+
+Règle de cohérence : **tous les compteurs cités** (nombre de serveurs, de
+tests, d'étapes) doivent correspondre à la réalité du moment. Vérifier avec :
+
+```bash
+grep -rnE "[0-9]+ tests|[0-9]+ serveurs|/9 étapes" README.md PLAN.md ERRATA.md AGENTS.md CONTRIBUTING.md
+```
+
+Les chiffres historiques du `CHANGELOG.md` sont la seule exception : ils
+décrivent chaque version à sa date et ne se réécrivent pas.
+
+## Workflow de commit
+
+```bash
+run_all.bat                    # obligatoire, doit être vert
+git add -A
+git commit -m "Phase N: resume court
+
+- points cles du changement
+- tests: X/Y, run_all N/N"
+git push                       # uniquement si l'utilisateur le demande
+```
+
+- Un commit = un sujet cohérent (une phase ou une correction).
+- **Ne jamais pousser sans demande explicite** de l'utilisateur.
+- Ne jamais committer `build/`, `tests/report.html`, `tmp-test/` (gitignorés).
 
 ## Vue d'ensemble
 
-Serveurs MCP écrits en **PureBasic** (3 exécutables), sources dans `src/` :
+**8 serveurs MCP** écrits en **PureBasic** (sources dans `src/`) :
 
 - `fileMCP.pb` — gestion de fichiers confinée (`MCP_ROOT`/`MCP_ROOT_SECRET`)
 - `MCP-Fetch-PB.pb` — fetch web (HTML → Markdown, protection SSRF)
 - `MCP-SequentialThinking-PB.pb` — raisonnement séquentiel
 - `memoryMCP.pb` + `memory_core.pbi` — mémoire SQLite (`MCP_MEMORY_DB`)
-- `dbMCP.pb` + `db_core.pbi` — exploration SQL (SQLite + PostgreSQL optionnel, lecture seule par defaut)
-- `context7MCP.pb` + `context7_core.pbi` — documentation Context7 (WinHTTP sous Windows)
-- `gitMCP.pb` + `git_core.pbi` — exploration de depots git locaux (sous-processus git)
-- `githubMCP.pb` + `github_core.pbi` — API REST GitHub (WinHTTP, mock pour les tests)
+- `dbMCP.pb` + `db_core.pbi` — exploration SQL (SQLite + PostgreSQL optionnel, lecture seule par défaut)
+- `context7MCP.pb` + `context7_core.pbi` — documentation Context7 (`MCP_CONTEXT7_API_KEY`)
+- `gitMCP.pb` + `git_core.pbi` — exploration de dépôts git locaux (sous-processus git)
+- `githubMCP.pb` + `github_core.pbi` — API REST GitHub (`MCP_GITHUB_TOKEN`, mock pour les tests)
 
 Transport **JSON-RPC 2.0 sur stdin/stdout**, une ligne JSON par message.
 Exécutables **console**, 100 % natifs, multi-OS (Windows / Linux / macOS).
-Pas de dépendance externe. Le cœur métier d'un serveur va dans un
-`src/<serveur>_core.pbi` (testable), le `.pb` ne contient que le `main`.
+Le cœur métier d'un serveur va dans `src/<serveur>_core.pbi` (testable), le
+`.pb` ne contient que le `main` (lecture d'env + hooks + `MCPMainLoop()`).
 
 ## Commandes essentielles
 
 ```bash
-build.bat              # Windows : compile -> build\fileMCP.exe
-./build.sh             # Linux/macOS : compile -> build/fileMCP
-python tests/test_mcp.py   # tests fonctionnels (100 tests, doit être 100/100)
+build.bat              # Windows : compile les 8 serveurs -> build\*.exe
+./build.sh             # Linux/macOS : compile les 8 serveurs -> build/
+run_all.bat            # compilation + 6 suites unitaires + intégration + report.html
+./run_all.sh           # idem sous Linux/macOS
+python tests/test_mcp.py [serveur]   # intégration seule (100 tests)
 ./clean.sh             # nettoie build/
 ```
 
-Le compilateur est cherché via `PBCOMPILER`, `C:\Program Files\PureBasic\Compilers\pbcompiler.exe`,
-`C:\PureBasic\Compilers\pbcompiler.exe`, puis le `PATH`.
+## Architecture (mcp_common/)
+
+Ordre d'inclusion dans un serveur :
+
+```purebasic
+IncludeFile "../mcp_common/stdio.pbi"        ; E/S stdio, stderr, CheckStdio
+IncludeFile "../mcp_common/logging.pbi"      ; LogDebug / LogError (stderr)
+IncludeFile "../mcp_common/json_helpers.pbi" ; GetArg*, AddProp*, ToolDef
+IncludeFile "../mcp_common/http.pbi"         ; HttpGetHeaders / HttpPostHeaders (API web)
+IncludeFile "../mcp_common/protocol.pbi"     ; identité + initialize
+IncludeFile "../mcp_common/jsonrpc.pbi"      ; noyau JSON-RPC + MCPMainLoop
+```
+
+Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
+`*G_ToolHandler` et `*G_CatalogBuilder`, vérifier `CheckStdio()`, appeler
+`MCPMainLoop()`. Modèle complet : `examples/minimal_server.pb`.
 
 ## Règles à respecter impérativement
 
-1. **`EnableExplicit` est activé** : toute variable doit être déclarée.
-2. **Ne jamais utiliser `Input()`** : lire stdin via `ReadStdinLine()`
-   (couche bufferisée fiable en mode pipe) ; écrire via `SendRawLine()`.
+1. **`EnableExplicit`** : toute variable doit être déclarée.
+2. **Ne jamais utiliser `Input()`** : `ReadStdinLine()` / `SendRawLine()`
+   (fiables en mode pipe). Logs uniquement sur **stderr**.
 3. Sélection OS par `CompilerIf #PB_Compiler_OS = #PB_OS_Windows` /
-   `CompilerElse` — le code compile sur les 3 plateformes.
+   `CompilerElse` — le code doit compiler sur les 3 plateformes.
 4. Commentaires et messages d'erreur en **français**, style du fichier.
-5. **Architecture** : tout serveur s'appuie sur `mcp_common/` (inclure dans
-   l'ordre `stdio.pbi`, `logging.pbi`, `json_helpers.pbi`, `protocol.pbi`,
-   `jsonrpc.pbi`), renseigne les hooks `*G_ToolHandler` / `*G_CatalogBuilder`,
-   puis appelle `MCPMainLoop()`. Modèle : `examples/minimal_server.pb`.
-   Ne jamais réintroduire de code stdio/JSON-RPC dupliqué dans un serveur.
+5. Aucune duplication de code stdio/JSON-RPC/HTTP dans un serveur : tout va
+   dans `mcp_common/`.
 6. Tout nouvel outil MCP doit :
-   - être ajouté dans `BuildToolsCatalog()` (nom, description, schéma) ;
-   - avoir son `Case` dans le dispatch `ToolDispatch` ;
-   - (fileMCP) passer par `ValiderChemin()` (confinement à `MCP_ROOT`) ;
+   - être ajouté au catalogue (`BuildToolsCatalog` / `XxxBuildCatalog`) ;
+   - avoir son `Case` dans le dispatch ;
+   - assainir ses entrées (chemins, refs, segments d'URL) avant usage ;
    - commencer ses messages d'échec par `Erreur` / `ERREUR` / `Impossible` /
      `Echec` ou contenir `introuvable` / `refusee` / `depasse` pour que
      `isError` soit positionné (heuristique `DetectIsError`) ;
-   - être couvert par un test dans `tests/test_mcp.py`.
-7. Ne jamais élargir le périmètre de sécurité sans demande explicite
-   (suppression récursive, fichiers binaires, transport réseau…).
-8. Les exécutables vont dans `build/` (gitignoré) — ne jamais committer de
-   binaire. Logs uniquement sur **stderr** (`LogDebug`/`LogError`).
-9. **Avant chaque commit** : `run_all.bat` / `./run_all.sh` doit être vert
-   (4 étapes : compilation, tests unitaires, tests d'intégration).
+   - être couvert par un test unitaire (`tests/test_<serveur>.pb`) et/ou
+     d'intégration (`tests/test_mcp.py`).
+7. Protections obligatoires : confinement `MCP_ROOT` (fileMCP), écritures SQL
+   derrière `MCP_DB_ALLOW_WRITE`, écritures GitHub derrière `confirm=true`,
+   validation anti-injection (`GitSafeParam`, `GhSafeSegment`).
+8. Ne jamais élargir le périmètre de sécurité sans demande explicite.
+9. Les exécutables vont dans `build/` (gitignoré) — jamais de binaire commité.
+
+## Pièges PureBasic rencontrés (ne pas les réintroduire)
+
+- **Mots réservés** : `Args`, `To`, `Result` ne peuvent pas être des noms de
+  variables/paramètres. Renommer (`GitArgs`, `Dest`, `R`).
+- **Paramètres structure** : passage **par pointeur uniquement** —
+  `Procedure Foo(*P.MaStructure)` + appel `Foo(@MaVar)`. `Procedure Foo(P.MaStructure)`
+  est une erreur de syntaxe.
+- **Piège `Protected Status.Integer`** : `Integer` est une *structure* ;
+  l'utiliser comme scalaire (`Str(Status)`, comparaisons) donne l'adresse de la
+  structure. Déclarer `Status.i` et passer `@Status` au pointeur typé
+  `*Status.Integer`.
+- **Curseur `ForEach`** : un `ForEach` imbriqué déplace le curseur du `ForEach`
+  externe → boucle infinie. Utiliser une map de membership ou un index.
+- **`Trim()` PureBasic** ne retire pas `#CR$`/`#LF$` (seulement espaces/tabs) :
+  utiliser `TrimOut()` (git_core) ou `ReplaceString`.
+- **Chaînes JSON en PureBasic** : `~"{\"cle\":\"valeur\"}"` (préfixe `~`) ;
+  un `\"` dans une chaîne normale est une erreur de compilation.
+- **`OpenDatabase`** (SQLite) exige un fichier existant : créer le fichier vide
+  avant ouverture.
+- **PRAGMA / EXPLAIN** : colonnes sans type déclaré ; utiliser
+  `CheckDatabaseNull` pour distinguer un vrai NULL.
+- **Sous-processus (RunProgram)** : `ReadProgramString` doit être lu dans une
+  boucle jusqu'à `ProgramRunning() = 0` (sinon sortie vide). stderr n'est pas
+  lisible de façon fiable → passer par le shell avec `2>&1`
+  (`cmd.exe /c ""exe" args 2>&1"`) après validation stricte des entrées.
+- **HTTP avec en-têtes** : seuls WinHTTP (Windows) les supporte ; pas d'API
+  d'en-têtes dans le HTTP intégré de PureBasic.
+- **IDE/projets** : `.pbi` = module d'inclusion ; un projet IDE est un `.pbp`
+  (non fourni, voir README). Ne pas inventer de format de projet.
 
 ## Protocole MCP (rappel)
 
@@ -67,25 +176,25 @@ Le compilateur est cherché via `PBCOMPILER`, `C:\Program Files\PureBasic\Compil
 - Réponse outil : `result.content[0].text` + `result.isError`.
 - `tools/list` retourne le catalogue ; `notifications/initialized` est ignoré ;
   EOF sur stdin = arrêt propre du serveur.
-- Variables d'environnement : `MCP_ROOT` (racine autorisée), `MCP_ROOT_SECRET`
-  (secret de `change_root`).
+- Variables d'environnement par serveur : voir README et SECURITY.md.
 
 ## Structure
 
 ```
-mcp_common/                       modules partages (stdio, logging, json_helpers, protocol, jsonrpc)
+mcp_common/                       modules partages (stdio, logging, json_helpers, http, protocol, jsonrpc)
 src/fileMCP.pb                    gestion de fichiers
 src/MCP-Fetch-PB.pb               fetch web
 src/MCP-SequentialThinking-PB.pb  raisonnement sequentiel
-src/memoryMCP.pb + memory_core.pbi  memoire SQLite
-src/dbMCP.pb + db_core.pbi        exploration SQL (sqlite + postgres)
+src/memoryMCP.pb + memory_core.pbi      memoire SQLite
+src/dbMCP.pb + db_core.pbi              exploration SQL (sqlite + postgres)
 src/context7MCP.pb + context7_core.pbi  documentation Context7
-src/gitMCP.pb + git_core.pbi      exploration git locale
-src/githubMCP.pb + github_core.pbi  API REST GitHub
+src/gitMCP.pb + git_core.pbi            exploration git locale
+src/githubMCP.pb + github_core.pbi      API REST GitHub
 examples/minimal_server.pb        serveur MCP minimal de demo
 build.bat/build.sh                compilation des 8 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
+tests/mock_github.py              mock local de l'API GitHub
 tests/test_mcp.py                 tests d'integration des 8 serveurs (100 tests)
 tests/unit_test.pbi               framework de tests unitaires PureBasic
 tests/test_common.pb              tests unitaires mcp_common (24 tests)
@@ -93,7 +202,9 @@ tests/test_memory.pb              tests unitaires Memory (33 tests)
 tests/test_database.pb            tests unitaires Database (37 tests)
 tests/test_context7.pb            tests unitaires Context7 (19 tests)
 tests/test_git.pb                 tests unitaires Git (24 tests)
+tests/test_github.pb              tests unitaires GitHub (40 tests)
 ```
 
-Voir aussi : [README.md](README.md), [PLAN.md](PLAN.md), [CONTRIBUTING.md](CONTRIBUTING.md),
-[ROADMAP.md](ROADMAP.md), [ERRATA.md](ERRATA.md), [SECURITY.md](SECURITY.md).
+Voir aussi : [PLAN.md](PLAN.md), [README.md](README.md),
+[CONTRIBUTING.md](CONTRIBUTING.md), [ROADMAP.md](ROADMAP.md),
+[ERRATA.md](ERRATA.md), [SECURITY.md](SECURITY.md).

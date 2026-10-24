@@ -268,10 +268,15 @@ clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
+├── mock_github.py          # Mock local de l'API GitHub (integration)
 ├── test_mcp.py             # Tests fonctionnels des 8 serveurs (100 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
-└── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
+├── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
+├── test_database.pb        # Tests unitaires du serveur Database (37 tests)
+├── test_context7.pb        # Tests unitaires du serveur Context7 (19 tests)
+├── test_git.pb             # Tests unitaires du serveur Git (24 tests)
+└── test_github.pb          # Tests unitaires du serveur GitHub (40 tests)
 ```
 
 Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), renseignez les hooks `*G_ToolHandler` / `*G_CatalogBuilder` et appelez `MCPMainLoop()`.
@@ -285,7 +290,7 @@ Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), ren
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contribuer (conventions, tests)
 - [SECURITY.md](SECURITY.md) — signalement de vulnérabilités, modèle de sécurité
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — code de conduite
-- [AGENTS.md](AGENTS.md) — instructions pour les agents IA
+- [AGENTS.md](AGENTS.md) — reprise du développement, checklist de mise à jour des `.md` avant commit, pièges PureBasic
 
 ## Licence
 

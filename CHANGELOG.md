@@ -5,6 +5,13 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 ## [Non publié]
 
 ### Documentation
+- **`AGENTS.md`** restructuré : section **« Reprise du développement »**
+  (bootstrap), **règle absolue de synchronisation des `.md` avant chaque
+  commit** (checklist fichier par fichier), workflow de commit/push,
+  architecture `mcp_common/` complète (dont `http.pbi`), et catalogue des
+  pièges PureBasic rencontrés (mots réservés, structures par pointeur,
+  `Status.Integer`, curseur ForEach, Trim/CRLF, JSON `~`, OpenDatabase,
+  sous-processus, HTTP, formats `.pbi`/`.pbp`).
 - **`PLAN.md`** : suivi des phases 0-6 (statut, livrables, définition de
   « terminé », tests par phase).
 - `ROADMAP.md` réécrite (phases 0-5 terminées, reliquats par serveur).
@@ -12,6 +19,7 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
   conventions d'outils et de sécurité.
 - `SECURITY.md` : tableau des surfaces/protections des 8 serveurs, secrets
   et recommandations de déploiement.
+- `README.md` : lien vers le suivi de plan et compteurs actualisés.
 - Compteurs de tests actualisés (177 unitaires, 100 intégration) dans README,
   ERRATA, AGENTS, modèles d'issues/PR.
 
