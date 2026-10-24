@@ -4,7 +4,29 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
-### Ajouté
+### Ajouté (Phase 0 — infrastructure commune et harnais de test)
+- **`mcp_common/`** : modules partages par tous les serveurs —
+  `stdio.pbi` (E/S stdio multi-OS), `logging.pbi` (logs sur stderr),
+  `json_helpers.pbi` (arguments + schémas d'outils), `protocol.pbi`
+  (identité + réponse `initialize`), `jsonrpc.pbi` (noyau JSON-RPC 2.0
+  générique : dispatch par hooks `*G_ToolHandler`/`*G_CatalogBuilder`,
+  boucle `MCPMainLoop()`).
+- **`examples/minimal_server.pb`** : serveur MCP minimal de démo
+  (validation de la Phase 0, < 200 lignes).
+- **`tests/mcp_client.py`** : harnais de test externe (client MCP Python
+  avec validation de conformité JSON-RPC 2.0).
+- **`tests/unit_test.pbi` + `tests/test_common.pb`** : micro-framework de
+  tests unitaires PureBasic + 24 tests sur les modules communs.
+- **`run_all.bat` / `run_all.sh`** : compilation + tests unitaires +
+  tests d'intégration + rapport `tests/report.html`.
+
+### Modifié
+- Refactor des 3 serveurs (`fileMCP`, `MCP-Fetch-PB`,
+  `MCP-SequentialThinking-PB`) sur `mcp_common/` : suppression de toute
+  la duplication (couche stdio, JSON-RPC, helpers JSON). Comportement
+  inchangé, validé par les 26 tests d'intégration.
+
+### Ajouté (serveurs)
 - **MCP-Fetch-PB** : serveur MCP de récupération web (`src/MCP-Fetch-PB.pb`) —
   outil `fetch` (URL → Markdown, HTML brut en option), protection SSRF
   (HTTP/HTTPS uniquement, IPs littérales refusées), timeout.

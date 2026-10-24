@@ -16,3 +16,6 @@ src/test.txt
 # Python (harnais de tests)
 __pycache__/
 *.pyc
+
+# Rapports de tests generes
+tests/report.html

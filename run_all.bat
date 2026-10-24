@@ -1,0 +1,74 @@
+@echo off
+setlocal
+rem ============================================================================
+rem  run_all.bat - Compile tout, lance les tests unitaires puis les tests
+rem  d'integration Python, et genere un rapport tests/report.html.
+rem  Code de sortie : 0 si tout passe, 1 sinon.
+rem ============================================================================
+
+set "ROOT=%~dp0"
+cd /d "%ROOT%"
+
+set "PBC="
+if defined PBCOMPILER set "PBC=%PBCOMPILER%"
+if not defined PBC if exist "C:\Program Files\PureBasic\Compilers\pbcompiler.exe" set "PBC=C:\Program Files\PureBasic\Compilers\pbcompiler.exe"
+if not defined PBC if exist "C:\PureBasic\Compilers\pbcompiler.exe" set "PBC=C:\PureBasic\Compilers\pbcompiler.exe"
+if not defined PBC where pbcompiler.exe >nul 2>nul && set "PBC=pbcompiler.exe"
+
+if not defined PBC (
+    echo [ERREUR] Compilateur PureBasic introuvable. Definissez PBCOMPILER.
+    exit /b 1
+)
+
+set /a STEP_OK=0
+set /a STEP_KO=0
+
+echo.
+echo === Compilation des serveurs ===
+call build.bat || (call :ko "compilation serveurs" & goto :report)
+call :ok "compilation serveurs"
+
+echo.
+echo === Compilation des tests unitaires ===
+if not exist build mkdir build
+"%PBC%" tests\test_common.pb /EXE build\test_common.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests unitaires" & goto :report)
+call :ok "compilation tests unitaires"
+
+echo.
+echo === Tests unitaires PureBasic ===
+build\test_common.exe 2>&1 || (call :ko "tests unitaires" & goto :report)
+call :ok "tests unitaires"
+
+echo.
+echo === Tests d'integration Python ===
+python tests\test_mcp.py || (call :ko "tests d'integration" & goto :report)
+call :ok "tests d'integration"
+
+goto :report
+
+:ok
+set /a STEP_OK+=1
+exit /b 0
+
+:ko
+set /a STEP_KO+=1
+echo [FAIL] %~1
+exit /b 0
+
+:report
+echo.
+echo === Rapport ===
+echo Etapes reussies : %STEP_OK%, echouees : %STEP_KO%
+
+rem Rapport HTML minimal
+(
+echo ^<!DOCTYPE html^>
+echo ^<html^>^<head^>^<meta charset="utf-8"^>^<title^>Rapport de tests MCP-file-PB^</title^>^</head^>^<body^>
+echo ^<h1^>Rapport de tests^</h1^>
+echo ^<p^>Etapes reussies : %STEP_OK% - echouees : %STEP_KO%^</p^>
+echo ^</body^>^</html^>
+) > tests\report.html
+echo Rapport genere : tests\report.html
+
+if %STEP_KO% gtr 0 exit /b 1
+exit /b 0

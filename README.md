@@ -79,7 +79,19 @@ Les exécutables compilés ne sont pas versionnés : publiez-les via [GitHub Rel
 
 ## Tests
 
-Un harnais de tests fonctionnels (Python 3, sans dépendance) lance chaque serveur compilé et exerce ses outils, y compris les cas de sécurité (traversées de chemins, secret invalide, URLs invalides) :
+Trois niveaux de tests, lances d'un coup par `run_all.bat` / `./run_all.sh`
+(compilation + tests unitaires + tests d'integration + `tests/report.html`) :
+
+```bash
+run_all.bat        # ou ./run_all.sh : tout verifier
+```
+
+- **Unitaires (PureBasic)** : `tests/unit_test.pbi` (micro-framework) +
+  `tests/test_common.pb` (24 tests sur `mcp_common/`). Chaque futur module
+  ajoutera un `tests/test_<module>.pb`.
+- **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (26 tests qui
+  exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
 python tests/test_mcp.py                          # les 3 serveurs
@@ -119,6 +131,13 @@ Chaque serveur démarre, attend les requêtes JSON-RPC sur stdin, et se termine 
 ## Structure du dépôt
 
 ```
+mcp_common/               Modules partages par tous les serveurs MCP
+├── stdio.pbi             Couche E/S stdio multi-OS (stdin bufferise, stdout/stderr)
+├── logging.pbi           LogDebug/LogError sur stderr (jamais sur stdout)
+├── json_helpers.pbi      Lecture d'arguments + construction de schemas d'outils
+├── protocol.pbi          Identite serveur + reponse initialize
+└── jsonrpc.pbi           Noyau JSON-RPC 2.0 generique (hooks + MCPMainLoop)
+
 src/
 ├── fileMCP.pb                    # Serveur gestion de fichiers (multi-OS)
 ├── MCP-Fetch-PB.pb               # Serveur fetch web (HTML -> Markdown)
@@ -127,10 +146,18 @@ src/
 ├── fileMCP_Linux.pbi             # Projet IDE PureBasic — Linux
 └── fileMCP_macOS.pbi             # Projet IDE PureBasic — macOS
 
-build.bat / build.sh      # Compilation des 3 serveurs (sortie dans build/)
-clean.bat / clean.sh      # Suppression des artefacts de compilation
-tests/test_mcp.py         # Tests fonctionnels des 3 serveurs (JSON-RPC stdio)
+examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
+build.bat / build.sh        # Compilation des 3 serveurs (sortie dans build/)
+clean.bat / clean.sh        # Suppression des artefacts de compilation
+run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
+tests/
+├── mcp_client.py           # Harnais de test externe (client MCP Python)
+├── test_mcp.py             # Tests fonctionnels des 3 serveurs (26 tests)
+├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
+└── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
 ```
+
+Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), renseignez les hooks `*G_ToolHandler` / `*G_CatalogBuilder` et appelez `MCPMainLoop()`.
 
 ## Documentation
 

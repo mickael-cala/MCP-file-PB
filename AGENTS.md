@@ -35,17 +35,25 @@ Le compilateur est cherché via `PBCOMPILER`, `C:\Program Files\PureBasic\Compil
 3. Sélection OS par `CompilerIf #PB_Compiler_OS = #PB_OS_Windows` /
    `CompilerElse` — le code compile sur les 3 plateformes.
 4. Commentaires et messages d'erreur en **français**, style du fichier.
-5. Tout nouvel outil MCP doit :
+5. **Architecture** : tout serveur s'appuie sur `mcp_common/` (inclure dans
+   l'ordre `stdio.pbi`, `logging.pbi`, `json_helpers.pbi`, `protocol.pbi`,
+   `jsonrpc.pbi`), renseigne les hooks `*G_ToolHandler` / `*G_CatalogBuilder`,
+   puis appelle `MCPMainLoop()`. Modèle : `examples/minimal_server.pb`.
+   Ne jamais réintroduire de code stdio/JSON-RPC dupliqué dans un serveur.
+6. Tout nouvel outil MCP doit :
    - être ajouté dans `BuildToolsCatalog()` (nom, description, schéma) ;
-   - avoir son `Case` dans le dispatch `tools/call` ;
-   - passer par `ValiderChemin()` (confinement à `MCP_ROOT`) ;
-   - commencer ses messages d'échec par `Erreur` / `Impossible` / `Echec` /
-     `introuvable` / `refusee` / `depasse` pour que `isError` soit positionné ;
+   - avoir son `Case` dans le dispatch `ToolDispatch` ;
+   - (fileMCP) passer par `ValiderChemin()` (confinement à `MCP_ROOT`) ;
+   - commencer ses messages d'échec par `Erreur` / `ERREUR` / `Impossible` /
+     `Echec` ou contenir `introuvable` / `refusee` / `depasse` pour que
+     `isError` soit positionné (heuristique `DetectIsError`) ;
    - être couvert par un test dans `tests/test_mcp.py`.
-6. Ne jamais élargir le périmètre de sécurité sans demande explicite
+7. Ne jamais élargir le périmètre de sécurité sans demande explicite
    (suppression récursive, fichiers binaires, transport réseau…).
-7. Les exécutables vont dans `build/` (gitignoré) — ne jamais committer de
-   binaire.
+8. Les exécutables vont dans `build/` (gitignoré) — ne jamais committer de
+   binaire. Logs uniquement sur **stderr** (`LogDebug`/`LogError`).
+9. **Avant chaque commit** : `run_all.bat` / `./run_all.sh` doit être vert
+   (4 étapes : compilation, tests unitaires, tests d'intégration).
 
 ## Protocole MCP (rappel)
 
@@ -59,12 +67,17 @@ Le compilateur est cherché via `PBCOMPILER`, `C:\Program Files\PureBasic\Compil
 ## Structure
 
 ```
+mcp_common/                       modules partages (stdio, logging, json_helpers, protocol, jsonrpc)
 src/fileMCP.pb                    gestion de fichiers
 src/MCP-Fetch-PB.pb               fetch web
 src/MCP-SequentialThinking-PB.pb  raisonnement sequentiel
 src/*.pbi                         fichiers projet IDE PureBasic (fileMCP)
+examples/minimal_server.pb        serveur MCP minimal de demo
 build.bat/build.sh                compilation des 3 serveurs ; clean.* : nettoyage
-tests/test_mcp.py                 harnais de tests stdio (26 tests)
+run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
+tests/mcp_client.py               harnais de test externe (client MCP Python)
+tests/test_mcp.py                 tests d'integration des 3 serveurs (26 tests)
+tests/unit_test.pbi + test_common.pb  framework + tests unitaires (24 tests)
 ```
 
 Voir aussi : [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md),

@@ -1,62 +1,19 @@
-; PureBasic
 ; ============================================================================
 ;  SERVEUR MCP - PureBasic (Console / Stdio) - 100 % Natif (Sans DLL / API)
+;  Gestion de fichiers confinee a une racine autorisee (MCP_ROOT)
 ; ============================================================================
-;  Compilation : Options du compilateur -> Format d'exécutable: Console
-;  Transport   : JSON-RPC 2.0 sur stdin / stdout (délimité par \n)
+;  Compilation : build.bat / build.sh (ou Options du compilateur -> Console)
+;  Transport   : JSON-RPC 2.0 sur stdin / stdout (delimite par \n)
+;  Modules     : mcp_common/ (stdio, logging, json_helpers, protocol, jsonrpc)
 ; ============================================================================
 
 EnableExplicit
 
-; ---------------------------------------------------------------------------
-; Couche E/S stdio multi-plateforme (Windows / Linux / macOS)
-;   - Lecture stdin : fiable en mode pipe, gere proprement l'EOF sur les
-;     3 OS ; Input() est banni car non fiable.
-;   - Ecriture stdout :
-;       * Windows -> WriteFile(GetStdHandle(STD_OUTPUT_HANDLE))
-;                    + FlushFileBuffers (mode pipe/stdio MCP)
-;       * Linux/macOS -> write_() sur le descripteur 1 + fflush_(0)
-; ---------------------------------------------------------------------------
-
-CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-  #C_STD_INPUT_HANDLE  = -10
-  #C_STD_OUTPUT_HANDLE = -11
-
-  ; Chargement dynamique de kernel32 : les noms ReadFile/WriteFile entrent
-  ; en conflit avec des commandes PureBasic, on passe par PrototypeC.
-  PrototypeC protoGetStdHandle(nStdHandle.i)
-  PrototypeC protoReadFile(hFile.i, *lpBuffer, nNumberOfBytesToRead.l, *lpNumberOfBytesRead, *lpOverlapped)
-  PrototypeC protoWriteFile(hFile.i, *lpBuffer, nNumberOfBytesToWrite.l, *lpNumberOfBytesWritten, *lpOverlapped)
-  PrototypeC protoFlushFileBuffers(hFile.i)
-
-  Global hKernel32.i = OpenLibrary(#PB_Any, "kernel32.dll")
-  Global Std_GetHandle.protoGetStdHandle         = GetFunction(hKernel32, "GetStdHandle")
-  Global Std_ReadFile.protoReadFile              = GetFunction(hKernel32, "ReadFile")
-  Global Std_WriteFile.protoWriteFile            = GetFunction(hKernel32, "WriteFile")
-  Global Std_FlushBuffers.protoFlushFileBuffers  = GetFunction(hKernel32, "FlushFileBuffers")
-CompilerEndIf
-
-Procedure SendRawLine(Text.s)
-  Protected OutText.s = Text + #LF$
-  Protected Size.i = StringByteLength(OutText, #PB_UTF8)
-  If Size = 0 : ProcedureReturn : EndIf
-
-  Protected *Mem = AllocateMemory(Size)
-  If *Mem
-    PokeS(*Mem, OutText, -1, #PB_UTF8 | #PB_String_NoZero)
-    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-      Protected hOut.i = Std_GetHandle(#C_STD_OUTPUT_HANDLE)
-      Protected WrittenLow.l = 0
-      Std_WriteFile(hOut, *Mem, Size, @WrittenLow, #Null)
-      Std_FlushBuffers(hOut)
-    CompilerElse
-      Protected Written.i = write_(1, *Mem, Size)
-      fflush_(0)
-    CompilerEndIf
-    FreeMemory(*Mem)
-  EndIf
-EndProcedure
-
+IncludeFile "../mcp_common/stdio.pbi"
+IncludeFile "../mcp_common/logging.pbi"
+IncludeFile "../mcp_common/json_helpers.pbi"
+IncludeFile "../mcp_common/protocol.pbi"
+IncludeFile "../mcp_common/jsonrpc.pbi"
 
 Global G_AllowedRoot.s
 Global G_RootSecret.s
@@ -105,7 +62,7 @@ Procedure.s NormalizePath(Path.s)
   For i = 1 To Count
     Part = Trim(StringField(Path, i, Sep))
     If Part = "" Or Part = "."
-      ; Ignorer les séparateurs redondants et les segments neutres
+      ; Ignorer les separateurs redondants et les segments neutres
     ElseIf Part = ".."
       ; Remonter d'un cran si possible
       If ListSize(Segments()) > 0
@@ -200,7 +157,7 @@ Procedure.s ValiderChemin(CheminDemande.s)
     NormRoot = FullRoot
   CompilerEndIf
 
-  ; Confinement sous la racine autorisée
+  ; Confinement sous la racine autorisee
   If Left(NormPath, Len(NormRoot)) <> NormRoot
     ProcedureReturn ""
   EndIf
@@ -454,59 +411,13 @@ Procedure.s ToolChangeRoot(NewRoot.s, Secret.s)
   EndIf
 
   G_AllowedRoot = NormalizePath(NewRoot)
+  LogDebug("Racine autorisee modifiee : " + G_AllowedRoot)
   ProcedureReturn "Racine autorisee modifiee : " + G_AllowedRoot
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Construction JSON-RPC & Catalogue MCP
+; Catalogue MCP (hook *G_CatalogBuilder)
 ; ---------------------------------------------------------------------------
-
-
-Procedure AddProp(Obj.i, Key.s, Type.s, Descr.s)
-  Protected P.i = AddJSONMember(Obj, Key)
-  SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), Type)
-  SetJSONString(AddJSONMember(P, "description"), Descr)
-EndProcedure
-
-Procedure AddReq(Arr.i, Key.s)
-  SetJSONString(AddJSONElement(Arr), Key)
-EndProcedure
-
-Procedure ToolDef(ToolsArr.i, Name.s, Descr.s, PropsSpec.s, ReqSpec.s)
-  ; Construit la definition d'un outil MCP. PropsSpec = proprietes separes par
-  ; des ';', chaque entree etant 'cle|type|description'. ReqSpec = cles
-  ; requises separees par des ';'. Tout est cree nativement dans le document
-  ; cible (pas de valeurs partagees -> pas de segfault).
-  Protected ToolObj.i = AddJSONElement(ToolsArr)
-  SetJSONObject(ToolObj)
-  SetJSONString(AddJSONMember(ToolObj, "name"), Name)
-  SetJSONString(AddJSONMember(ToolObj, "description"), Descr)
-  Protected SchemaObj.i = AddJSONMember(ToolObj, "inputSchema")
-  SetJSONObject(SchemaObj)
-  SetJSONString(AddJSONMember(SchemaObj, "type"), "object")
-  Protected PropsObj.i = AddJSONMember(SchemaObj, "properties")
-  SetJSONObject(PropsObj)
-  Protected ReqArr.i = AddJSONMember(SchemaObj, "required")
-  SetJSONArray(ReqArr)
-
-  Protected i.i, n.i = CountString(PropsSpec, ";") + 1, Entry.s, K.s, T.s, D.s
-  For i = 1 To n
-    Entry = Trim(StringField(PropsSpec, i, ";"))
-    If Entry <> ""
-      K = Trim(StringField(Entry, 1, "|"))
-      T = Trim(StringField(Entry, 2, "|"))
-      D = Trim(StringField(Entry, 3, "|"))
-      AddProp(PropsObj, K, T, D)
-    EndIf
-  Next
-  n = CountString(ReqSpec, ";") + 1
-  For i = 1 To n
-    Entry = Trim(StringField(ReqSpec, i, ";"))
-    If Entry <> "" : AddReq(ReqArr, Entry) : EndIf
-  Next
-EndProcedure
-
 Procedure.i BuildToolsCatalog()
   Protected RootJSON.i = CreateJSON(#PB_Any)
   Protected RootVal.i = SetJSONObject(JSONValue(RootJSON))
@@ -518,7 +429,7 @@ Procedure.i BuildToolsCatalog()
   ToolDef(ToolsArr, "read_file_lines", "Lire une plage de lignes (fichier limite a 5 Mo)", "path|string|Chemin;startLine|integer|Ligne de depart (defaut:1);maxLines|integer|Nombre de lignes (defaut:50)", "path")
   ToolDef(ToolsArr, "write_file", "Ecrire/creer un fichier texte", "path|string|Chemin;content|string|Contenu", "path;content")
   ToolDef(ToolsArr, "create_directory", "Creer un repertoire", "path|string|Chemin", "path")
-  ToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou dossier vide", "path|string|Chemin", "path")
+  ToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou dossier", "path|string|Chemin", "path")
   ToolDef(ToolsArr, "move_file", "Deplacer ou renommer un fichier", "oldPath|string|Chemin source;newPath|string|Chemin destination", "oldPath;newPath")
   ToolDef(ToolsArr, "get_file_info", "Infos detaillees fichier/dossier", "path|string|Chemin", "path")
   ToolDef(ToolsArr, "search_files", "Rechercher du texte (recursif)", "path|string|Repertoire de depart;pattern|string|Texte recherche", "path;pattern")
@@ -527,295 +438,44 @@ Procedure.i BuildToolsCatalog()
   ProcedureReturn RootJSON
 EndProcedure
 
-Procedure SendResponse(RespJSON.i)
-  Protected Out.s = ComposeJSON(RespJSON)
-  SendRawLine(Out)
-  FreeJSON(RespJSON)
-EndProcedure
-
-Procedure SendRawError(IdValue.i, Code.i, Msg.s)
-  Protected J.i = CreateJSON(#PB_Any)
-  Protected Root.i = SetJSONObject(JSONValue(J))
-  SetJSONString(AddJSONMember(Root, "jsonrpc"), "2.0")
-  If IdValue
-    Protected IdMember.i = AddJSONMember(Root, "id")
-    If JSONType(IdValue) = #PB_JSON_String
-      SetJSONString(IdMember, GetJSONString(IdValue))
-    ElseIf JSONType(IdValue) = #PB_JSON_Number
-      SetJSONDouble(IdMember, GetJSONDouble(IdValue))
-    Else
-      SetJSONNull(IdMember)
-    EndIf
-  Else
-    SetJSONNull(AddJSONMember(Root, "id"))
-  EndIf
-  Protected ErrObj.i = AddJSONMember(Root, "error")
-  SetJSONObject(ErrObj)
-  SetJSONInteger(AddJSONMember(ErrObj, "code"), Code)
-  SetJSONString(AddJSONMember(ErrObj, "message"), Msg)
-  SendResponse(J)
-EndProcedure
-
-Procedure.s GetArgString(ArgsObj.i, Key.s)
-  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
-    Protected Member.i = GetJSONMember(ArgsObj, Key)
-    If Member And JSONType(Member) = #PB_JSON_String
-      ProcedureReturn GetJSONString(Member)
-    EndIf
-  EndIf
-  ProcedureReturn ""
-EndProcedure
-
-Procedure.i GetArgInt(ArgsObj.i, Key.s, DefaultVal.i)
-  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
-    Protected Member.i = GetJSONMember(ArgsObj, Key)
-    If Member And JSONType(Member) = #PB_JSON_Number
-      ProcedureReturn GetJSONInteger(Member)
-    EndIf
-  EndIf
-  ProcedureReturn DefaultVal
-EndProcedure
-
-Procedure AttachResultPayload(ResultObj.i, ContentText.s, IsError.i)
-  Protected ContentArr.i = AddJSONMember(ResultObj, "content")
-  SetJSONArray(ContentArr)
-  Protected ItemObj.i = AddJSONElement(ContentArr)
-  SetJSONObject(ItemObj)
-  SetJSONString(AddJSONMember(ItemObj, "type"), "text")
-  SetJSONString(AddJSONMember(ItemObj, "text"), ContentText)
-  SetJSONBoolean(AddJSONMember(ResultObj, "isError"), IsError)
-EndProcedure
-
 ; ---------------------------------------------------------------------------
-; Traitement d'une requête JSON-RPC
+; Dispatch des outils (hook *G_ToolHandler)
 ; ---------------------------------------------------------------------------
-
-Procedure ProcessRequest(Line.s)
-  Protected ReqJSON.i = ParseJSON(#PB_Any, Line)
-  If Not ReqJSON
-    SendRawError(#Null, -32700, "Parse error: invalid JSON")
-    ProcedureReturn
-  EndIf
-
-  Protected RootVal.i = JSONValue(ReqJSON)
-  If JSONType(RootVal) <> #PB_JSON_Object
-    FreeJSON(ReqJSON)
-    SendRawError(#Null, -32600, "Invalid Request: Root must be an object")
-    ProcedureReturn
-  EndIf
-
-  Protected MethodMember.i = GetJSONMember(RootVal, "method")
-  Protected Method.s = ""
-  If MethodMember And JSONType(MethodMember) = #PB_JSON_String
-    Method = GetJSONString(MethodMember)
-  EndIf
-
-  Protected IdMember.i = GetJSONMember(RootVal, "id")
-
-  ; Notifications : pas de réponse attendue
-  If Method = "notifications/initialized"
-    FreeJSON(ReqJSON)
-    ProcedureReturn
-  EndIf
-
-  ; Cas particulier tools/list : émission directe du catalogue composé
-  If Method = "tools/list"
-    ; Reponse conforme JSON-RPC : le catalogue est compose en un seul objet
-    ; "result" puis envoye sur une ligne (protocole stdio delimite par \n).
-    Protected CatalogJSON.i = BuildToolsCatalog()
-
-    Protected IdValStr.s = "null"
-    If IdMember
-      If JSONType(IdMember) = #PB_JSON_String
-        IdValStr = Chr(34) + GetJSONString(IdMember) + Chr(34)
-      ElseIf JSONType(IdMember) = #PB_JSON_Number
-        IdValStr = Str(GetJSONInteger(IdMember))
-      EndIf
-    EndIf
-
-    Protected Body.s = ComposeJSON(CatalogJSON)
-    SendRawLine(Chr(123) + Chr(34) + "jsonrpc" + Chr(34) + ":" + Chr(34) + "2.0" + Chr(34) + "," + Chr(34) + "id" + Chr(34) + ":" + IdValStr + "," + Chr(34) + "result" + Chr(34) + ":" + Body + Chr(125))
-    FreeJSON(CatalogJSON)
-    FreeJSON(ReqJSON)
-    ProcedureReturn
-  EndIf
-
-  ; Création de la réponse JSON-RPC standard
-  Protected RespJSON.i = CreateJSON(#PB_Any)
-  Protected RespRoot.i = SetJSONObject(JSONValue(RespJSON))
-  SetJSONString(AddJSONMember(RespRoot, "jsonrpc"), "2.0")
-
-  Protected ResId.i = AddJSONMember(RespRoot, "id")
-  If IdMember
-    If JSONType(IdMember) = #PB_JSON_String
-      SetJSONString(ResId, GetJSONString(IdMember))
-    ElseIf JSONType(IdMember) = #PB_JSON_Number
-      SetJSONDouble(ResId, GetJSONDouble(IdMember))
-    Else
-      SetJSONNull(ResId)
-    EndIf
-  Else
-    SetJSONNull(ResId)
-  EndIf
-
-  Protected ResultObj.i = AddJSONMember(RespRoot, "result")
-  SetJSONObject(ResultObj)
-
-  Select Method
-    Case "initialize"
-      SetJSONString(AddJSONMember(ResultObj, "protocolVersion"), "2024-11-05")
-      Protected Caps.i = AddJSONMember(ResultObj, "capabilities")
-      SetJSONObject(Caps)
-      SetJSONObject(AddJSONMember(Caps, "tools"))
-      Protected ServerInfo.i = AddJSONMember(ResultObj, "serverInfo")
-      SetJSONObject(ServerInfo)
-      SetJSONString(AddJSONMember(ServerInfo, "name"), "FileMCPServer-PureBasic")
-      SetJSONString(AddJSONMember(ServerInfo, "version"), "1.0.0")
-
-    Case "tools/call"
-      Protected ParamsMember.i = GetJSONMember(RootVal, "params")
-      Protected ToolName.s = ""
-      Protected ArgsMember.i = #Null
-      If ParamsMember And JSONType(ParamsMember) = #PB_JSON_Object
-        ToolName = GetArgString(ParamsMember, "name")
-        ArgsMember = GetJSONMember(ParamsMember, "arguments")
-      EndIf
-
-      Protected OutputStr.s = ""
-      Protected IsErr.i = #False
-
-      Select ToolName
-        Case "list_files"
-          OutputStr = ToolListFiles(GetArgString(ArgsMember, "path"))
-        Case "read_file"
-          OutputStr = ToolReadFile(GetArgString(ArgsMember, "path"))
-        Case "read_file_lines"
-          OutputStr = ToolReadFileLines(GetArgString(ArgsMember, "path"), GetArgInt(ArgsMember, "startLine", 1), GetArgInt(ArgsMember, "maxLines", 50))
-        Case "write_file"
-          OutputStr = ToolWriteFile(GetArgString(ArgsMember, "path"), GetArgString(ArgsMember, "content"))
-        Case "create_directory"
-          OutputStr = ToolCreateDirectory(GetArgString(ArgsMember, "path"))
-        Case "delete_file"
-          OutputStr = ToolDeleteFile(GetArgString(ArgsMember, "path"))
-        Case "move_file"
-          OutputStr = ToolMoveFile(GetArgString(ArgsMember, "oldPath"), GetArgString(ArgsMember, "newPath"))
-        Case "get_file_info"
-          OutputStr = ToolGetFileInfo(GetArgString(ArgsMember, "path"))
-        Case "search_files"
-          OutputStr = ToolSearchFiles(GetArgString(ArgsMember, "path"), GetArgString(ArgsMember, "pattern"))
-        Case "change_root"
-          OutputStr = ToolChangeRoot(GetArgString(ArgsMember, "newRoot"), GetArgString(ArgsMember, "secret"))
-        Default
-          OutputStr = "Outil inconnu : " + ToolName
-          IsErr = #True
-      EndSelect
-
-      If OutputStr = "ACCES_REFUSE"
-        OutputStr = "Erreur : Acces refuse en dehors de la zone autorisee."
-        IsErr = #True
-      ElseIf FindString(OutputStr, "Erreur") = 1 Or FindString(OutputStr, "Impossible") = 1 Or FindString(OutputStr, "Echec") = 1 Or FindString(OutputStr, "introuvable") > 0 Or FindString(OutputStr, "refusee") > 0 Or FindString(OutputStr, "depasse") > 0
-        IsErr = #True
-      EndIf
-
-      AttachResultPayload(ResultObj, OutputStr, IsErr)
-
+Procedure.s ToolDispatch(ToolName.s, ArgsObj.i, *IsError.Integer)
+  Select ToolName
+    Case "list_files"
+      ProcedureReturn ToolListFiles(GetArgString(ArgsObj, "path"))
+    Case "read_file"
+      ProcedureReturn ToolReadFile(GetArgString(ArgsObj, "path"))
+    Case "read_file_lines"
+      ProcedureReturn ToolReadFileLines(GetArgString(ArgsObj, "path"), GetArgInt(ArgsObj, "startLine", 1), GetArgInt(ArgsObj, "maxLines", 50))
+    Case "write_file"
+      ProcedureReturn ToolWriteFile(GetArgString(ArgsObj, "path"), GetArgString(ArgsObj, "content"))
+    Case "create_directory"
+      ProcedureReturn ToolCreateDirectory(GetArgString(ArgsObj, "path"))
+    Case "delete_file"
+      ProcedureReturn ToolDeleteFile(GetArgString(ArgsObj, "path"))
+    Case "move_file"
+      ProcedureReturn ToolMoveFile(GetArgString(ArgsObj, "oldPath"), GetArgString(ArgsObj, "newPath"))
+    Case "get_file_info"
+      ProcedureReturn ToolGetFileInfo(GetArgString(ArgsObj, "path"))
+    Case "search_files"
+      ProcedureReturn ToolSearchFiles(GetArgString(ArgsObj, "path"), GetArgString(ArgsObj, "pattern"))
+    Case "change_root"
+      ProcedureReturn ToolChangeRoot(GetArgString(ArgsObj, "newRoot"), GetArgString(ArgsObj, "secret"))
     Default
-      ; Autres requêtes
+      *IsError\i = #True
+      ProcedureReturn "Outil inconnu : " + ToolName
   EndSelect
-
-  SendResponse(RespJSON)
-  FreeJSON(ReqJSON)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Lecture stdin fiable en mode pipe (Windows : ReadFile sur le handle stdin,
-; Linux/macOS : read_() sur le descripteur 0)
+; Programme principal
 ; ---------------------------------------------------------------------------
-
-Global G_InBufSize.i   = 65536
-Global *G_InBuf        = AllocateMemory(G_InBufSize)
-Global G_InDataLen.i   = 0     ; octets valides dans le buffer
-Global G_InPos.i       = 0     ; position de lecture courante
-Global G_EOF.i         = #False
-
-Procedure.i FillInputBuffer()
-  If G_InPos >= G_InDataLen
-    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-      Protected ReadLow.l = 0
-      If Std_ReadFile(Std_GetHandle(#C_STD_INPUT_HANDLE), *G_InBuf, G_InBufSize, @ReadLow, #Null)
-        G_InDataLen = ReadLow
-      Else
-        G_InDataLen = 0
-      EndIf
-    CompilerElse
-      G_InDataLen = read_(0, *G_InBuf, G_InBufSize)
-    CompilerEndIf
-    G_InPos = 0
-    If G_InDataLen <= 0
-      G_EOF = #True
-      ProcedureReturn #False
-    EndIf
-  EndIf
-  ProcedureReturn #True
-EndProcedure
-
-Procedure.s ReadStdinLine()
-  ; Retourne "" sur EOF reel (fin de flux stdin) ; G_EOF est positionne
-  If Not FillInputBuffer()
-    ProcedureReturn ""
-  EndIf
-
-  Protected Start.i = G_InPos
-  Protected Found.i = #False
-
-  While #True
-    Protected i.i
-    For i = G_InPos To G_InDataLen - 1
-      If PeekB(*G_InBuf + i) = $0A
-        G_InPos = i + 1
-        Found = #True
-        Break
-      EndIf
-    Next
-
-    If Found
-      Break
-    EndIf
-
-    ; Pas de \n trouve : garder le reste, re-remplir
-    Protected Remaining.i = G_InDataLen - G_InPos
-    If Remaining > 0
-      MoveMemory(*G_InBuf + G_InPos, *G_InBuf, Remaining)
-    EndIf
-    G_InDataLen = Remaining
-    G_InPos = Remaining
-
-    If Not FillInputBuffer()
-      ; EOF sans newline final -> retourner ce qui reste
-      If G_InDataLen > G_InPos
-        G_InPos = G_InDataLen
-      EndIf
-      Break
-    EndIf
-
-    ; Guard anti-debordement : ligne trop longue -> on tronque
-    If G_InDataLen >= G_InBufSize
-      G_InPos = G_InDataLen
-      Break
-    EndIf
-  Wend
-
-  Protected Length.i = G_InPos - 1 - Start
-  If Length < 0 : Length = 0 : EndIf
-  If Length > 0 And PeekB(*G_InBuf + Start + Length - 1) = $0D
-    Length - 1                 ; retirer un \r eventuel (CRLF)
-  EndIf
-  ProcedureReturn PeekS(*G_InBuf + Start, Length, #PB_UTF8 | #PB_ByteLength)
-EndProcedure
-
-; ---------------------------------------------------------------------------
-; Boucle Principale
-; ---------------------------------------------------------------------------
+G_ServerName = "FileMCPServer-PureBasic"
+G_ServerVersion = "1.0.0"
+*G_ToolHandler = @ToolDispatch()
+*G_CatalogBuilder = @BuildToolsCatalog()
 
 G_AllowedRoot = GetEnvironmentVariable("MCP_ROOT")
 If G_AllowedRoot = ""
@@ -823,26 +483,12 @@ If G_AllowedRoot = ""
 EndIf
 G_AllowedRoot = NormalizePath(G_AllowedRoot)
 
-CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-  ; Verifier que la couche E/S stdio (kernel32) est bien chargee
-  If hKernel32 = 0 Or Std_GetHandle = 0 Or Std_ReadFile = 0 Or Std_WriteFile = 0
-    End 1
-  EndIf
-CompilerEndIf
-
 G_RootSecret = GetEnvironmentVariable("MCP_ROOT_SECRET")
 
-Define Line.s
+If Not CheckStdio()
+  End 1
+EndIf
 
-While #True
-  Line = ReadStdinLine()
-  If Line = "" And G_EOF
-    Break                      ; EOF stdin -> sortie propre du serveur
-  EndIf
-  Line = Trim(Line)
-  If Line <> ""
-    ProcessRequest(Line)
-  EndIf
-Wend
+MCPMainLoop()
 
 End

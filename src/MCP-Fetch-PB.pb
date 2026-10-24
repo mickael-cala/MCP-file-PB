@@ -1,127 +1,30 @@
 ; ============================================================================
 ;  SERVEUR MCP - Fetch (PureBasic Console / Stdio)
-;  Récupération de pages web + conversion HTML -> Markdown
+;  Recuperation de pages web + conversion HTML -> Markdown
+; ============================================================================
+;  Compilation : build.bat / build.sh (ou Options du compilateur -> Console)
+;  Transport   : JSON-RPC 2.0 sur stdin / stdout (delimite par \n)
+;  Modules     : mcp_common/ (stdio, logging, json_helpers, protocol, jsonrpc)
 ; ============================================================================
 
 EnableExplicit
 
-; ---------------------------------------------------------------------------
-; Couche E/S stdio (identique à fileMCP.pb / seqThinkingMCP.pb)
-; ---------------------------------------------------------------------------
-CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-  #C_STD_INPUT_HANDLE  = -10
-  #C_STD_OUTPUT_HANDLE = -11
-
-  PrototypeC protoGetStdHandle(nStdHandle.i)
-  PrototypeC protoReadFile(hFile.i, *lpBuffer, nNumberOfBytesToRead.l, *lpNumberOfBytesRead, *lpOverlapped)
-  PrototypeC protoWriteFile(hFile.i, *lpBuffer, nNumberOfBytesToWrite.l, *lpNumberOfBytesWritten, *lpOverlapped)
-  PrototypeC protoFlushFileBuffers(hFile.i)
-
-  Global hKernel32.i = OpenLibrary(#PB_Any, "kernel32.dll")
-  Global Std_GetHandle.protoGetStdHandle         = GetFunction(hKernel32, "GetStdHandle")
-  Global Std_ReadFile.protoReadFile              = GetFunction(hKernel32, "ReadFile")
-  Global Std_WriteFile.protoWriteFile            = GetFunction(hKernel32, "WriteFile")
-  Global Std_FlushBuffers.protoFlushFileBuffers  = GetFunction(hKernel32, "FlushFileBuffers")
-CompilerEndIf
-
-Procedure SendRawLine(Text.s)
-  Protected OutText.s = Text + #LF$
-  Protected Size.i = StringByteLength(OutText, #PB_UTF8)
-  If Size = 0 : ProcedureReturn : EndIf
-  Protected *Mem = AllocateMemory(Size)
-  If *Mem
-    PokeS(*Mem, OutText, -1, #PB_UTF8 | #PB_String_NoZero)
-    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-      Protected hOut.i = Std_GetHandle(#C_STD_OUTPUT_HANDLE)
-      Protected WrittenLow.l = 0
-      Std_WriteFile(hOut, *Mem, Size, @WrittenLow, #Null)
-      Std_FlushBuffers(hOut)
-    CompilerElse
-      Protected Written.i = write_(1, *Mem, Size)
-      fflush_(0)
-    CompilerEndIf
-    FreeMemory(*Mem)
-  EndIf
-EndProcedure
-
-Global G_InBufSize.i = 65536
-Global *G_InBuf      = AllocateMemory(G_InBufSize)
-Global G_InDataLen.i = 0
-Global G_InPos.i     = 0
-Global G_EOF.i       = #False
-
-Procedure.i FillInputBuffer()
-  If G_InPos >= G_InDataLen
-    CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-      Protected ReadLow.l = 0
-      If Std_ReadFile(Std_GetHandle(#C_STD_INPUT_HANDLE), *G_InBuf, G_InBufSize, @ReadLow, #Null)
-        G_InDataLen = ReadLow
-      Else
-        G_InDataLen = 0
-      EndIf
-    CompilerElse
-      G_InDataLen = read_(0, *G_InBuf, G_InBufSize)
-    CompilerEndIf
-    G_InPos = 0
-    If G_InDataLen <= 0
-      G_EOF = #True
-      ProcedureReturn #False
-    EndIf
-  EndIf
-  ProcedureReturn #True
-EndProcedure
-
-Procedure.s ReadStdinLine()
-  If Not FillInputBuffer()
-    ProcedureReturn ""
-  EndIf
-  Protected Start.i = G_InPos
-  Protected Found.i = #False
-  While #True
-    Protected i.i
-    For i = G_InPos To G_InDataLen - 1
-      If PeekB(*G_InBuf + i) = $0A
-        G_InPos = i + 1
-        Found = #True
-        Break
-      EndIf
-    Next
-    If Found : Break : EndIf
-    Protected Remaining.i = G_InDataLen - G_InPos
-    If Remaining > 0
-      MoveMemory(*G_InBuf + G_InPos, *G_InBuf, Remaining)
-    EndIf
-    G_InDataLen = Remaining
-    G_InPos = Remaining
-    If Not FillInputBuffer()
-      If G_InDataLen > G_InPos
-        G_InPos = G_InDataLen
-      EndIf
-      Break
-    EndIf
-    If G_InDataLen >= G_InBufSize
-      G_InPos = G_InDataLen
-      Break
-    EndIf
-  Wend
-  Protected Length.i = G_InPos - 1 - Start
-  If Length < 0 : Length = 0 : EndIf
-  If Length > 0 And PeekB(*G_InBuf + Start + Length - 1) = $0D
-    Length - 1
-  EndIf
-  ProcedureReturn PeekS(*G_InBuf + Start, Length, #PB_UTF8 | #PB_ByteLength)
-EndProcedure
+IncludeFile "../mcp_common/stdio.pbi"
+IncludeFile "../mcp_common/logging.pbi"
+IncludeFile "../mcp_common/json_helpers.pbi"
+IncludeFile "../mcp_common/protocol.pbi"
+IncludeFile "../mcp_common/jsonrpc.pbi"
 
 ; ---------------------------------------------------------------------------
-; Validation d'URL et garde-fous de sécurité
+; Validation d'URL et garde-fous de securite
 ; ---------------------------------------------------------------------------
 Procedure.i IsPrivateHost(Host.s)
-  ; Refuse les adresses privées / loopback / link-local (comme la référence)
+  ; Refuse les adresses privees / loopback / link-local (comme la reference)
   Host = LCase(Trim(Host))
   If Host = "localhost" Or Host = "127.0.0.1" Or Host = "::1"
     ProcedureReturn #True
   EndIf
-  ; Plages IPv4 privées courantes
+  ; Plages IPv4 privees courantes
   Protected Part1.i
   If FindString(Host, ".") > 0
     Part1 = Val(StringField(Host, 1, "."))
@@ -157,7 +60,7 @@ Procedure.s ValidateFetchUrl(Url.s)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Récupération HTTP en mémoire
+; Recuperation HTTP en memoire
 ; ---------------------------------------------------------------------------
 Procedure.s HttpGetMemory(Url.s, *OutStatus.Integer)
   Protected Req.i = HTTPRequestMemory(#PB_HTTP_Get, Url)
@@ -190,11 +93,11 @@ EndProcedure
 Procedure.s HtmlToMarkdown(Html.s)
   Protected Md.s = Html
 
-  ; Supprimer les blocs non désirés
+  ; Supprimer les blocs non desires
   Md = ReplaceString(Md, Chr(13), " ")
   Md = ReplaceString(Md, Chr(10), " ")
 
-  ; Supprimer script / style / head (approche par expressions simples)
+  ; Supprimer script / style (approche par expressions simples)
   Protected i.i
   ; <script>...</script>
   Repeat
@@ -217,10 +120,8 @@ Procedure.s HtmlToMarkdown(Html.s)
   Protected h.i
   For h = 1 To 6
     Protected OpenTag.s = "<h" + Str(h) + ">"
-    Protected OpenTagAttr.s = "<h" + Str(h) + " "
     Protected CloseTag.s = "</h" + Str(h) + ">"
     Protected Prefix.s = StringField(" # ## ### #### ##### ######", h + 1, " ") + " "
-    ; Version sans attribut
     Repeat
       i = FindString(LCase(Md), OpenTag)
       If i = 0 : Break : EndIf
@@ -282,7 +183,7 @@ Procedure.s HtmlToMarkdown(Html.s)
     Md = Left(Md, i - 1) + Mid(Md, j + 1)
   ForEver
 
-  ; Nettoyage des entités HTML basiques
+  ; Nettoyage des entites HTML basiques
   Md = ReplaceString(Md, "&nbsp;", " ")
   Md = ReplaceString(Md, "&amp;", "&")
   Md = ReplaceString(Md, "&lt;", "<")
@@ -300,10 +201,6 @@ EndProcedure
 ; ---------------------------------------------------------------------------
 ; Outil fetch
 ; ---------------------------------------------------------------------------
-Declare.s GetArgString(ArgsObj.i, Key.s)
-Declare.i GetArgInt(ArgsObj.i, Key.s, DefaultVal.i)
-Declare.i GetArgBool(ArgsObj.i, Key.s, DefaultVal.i)
-
 Procedure.s ToolFetch(ArgsObj.i)
   Protected Url.s         = GetArgString(ArgsObj, "url")
   Protected MaxLength.i   = GetArgInt(ArgsObj, "max_length", 5000)
@@ -350,70 +247,8 @@ Procedure.s ToolFetch(ArgsObj.i)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Helpers JSON (identiques aux autres serveurs)
+; Catalogue MCP (hook *G_CatalogBuilder)
 ; ---------------------------------------------------------------------------
-Procedure.s GetArgString(ArgsObj.i, Key.s)
-  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
-    Protected Member.i = GetJSONMember(ArgsObj, Key)
-    If Member And JSONType(Member) = #PB_JSON_String
-      ProcedureReturn GetJSONString(Member)
-    EndIf
-  EndIf
-  ProcedureReturn ""
-EndProcedure
-
-Procedure.i GetArgInt(ArgsObj.i, Key.s, DefaultVal.i)
-  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
-    Protected Member.i = GetJSONMember(ArgsObj, Key)
-    If Member And JSONType(Member) = #PB_JSON_Number
-      ProcedureReturn GetJSONInteger(Member)
-    EndIf
-  EndIf
-  ProcedureReturn DefaultVal
-EndProcedure
-
-Procedure.i GetArgBool(ArgsObj.i, Key.s, DefaultVal.i)
-  Protected Member.i, T.i
-  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
-    Member = GetJSONMember(ArgsObj, Key)
-    If Member
-      T = JSONType(Member)
-      If T = #PB_JSON_Boolean
-        ProcedureReturn GetJSONBoolean(Member)
-      ElseIf T = #PB_JSON_Number
-        ProcedureReturn Bool(GetJSONInteger(Member) <> 0)
-      EndIf
-    EndIf
-  EndIf
-  ProcedureReturn DefaultVal
-EndProcedure
-
-; ---------------------------------------------------------------------------
-; Catalogue MCP
-; ---------------------------------------------------------------------------
-Procedure AddPropString(Obj.i, Key.s, Descr.s)
-  Protected P.i = AddJSONMember(Obj, Key)
-  SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "string")
-  SetJSONString(AddJSONMember(P, "description"), Descr)
-EndProcedure
-
-Procedure AddPropInteger(Obj.i, Key.s, Descr.s, DefVal.i)
-  Protected P.i = AddJSONMember(Obj, Key)
-  SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "integer")
-  SetJSONString(AddJSONMember(P, "description"), Descr)
-  SetJSONInteger(AddJSONMember(P, "default"), DefVal)
-EndProcedure
-
-Procedure AddPropBoolean(Obj.i, Key.s, Descr.s, DefVal.i)
-  Protected P.i = AddJSONMember(Obj, Key)
-  SetJSONObject(P)
-  SetJSONString(AddJSONMember(P, "type"), "boolean")
-  SetJSONString(AddJSONMember(P, "description"), Descr)
-  SetJSONBoolean(AddJSONMember(P, "default"), DefVal)
-EndProcedure
-
 Procedure.i BuildToolsCatalog()
   Protected RootJSON.i = CreateJSON(#PB_Any)
   Protected RootVal.i = SetJSONObject(JSONValue(RootJSON))
@@ -445,177 +280,30 @@ Procedure.i BuildToolsCatalog()
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Réponses JSON-RPC
+; Dispatch des outils (hook *G_ToolHandler)
 ; ---------------------------------------------------------------------------
-Procedure SendResponse(RespJSON.i)
-  Protected Out.s = ComposeJSON(RespJSON)
-  SendRawLine(Out)
-  FreeJSON(RespJSON)
-EndProcedure
-
-Procedure SendRawError(IdValue.i, Code.i, Msg.s)
-  Protected J.i = CreateJSON(#PB_Any)
-  Protected Root.i = SetJSONObject(JSONValue(J))
-  SetJSONString(AddJSONMember(Root, "jsonrpc"), "2.0")
-  If IdValue
-    Protected IdMember.i = AddJSONMember(Root, "id")
-    If JSONType(IdValue) = #PB_JSON_String
-      SetJSONString(IdMember, GetJSONString(IdValue))
-    ElseIf JSONType(IdValue) = #PB_JSON_Number
-      SetJSONDouble(IdMember, GetJSONDouble(IdValue))
-    Else
-      SetJSONNull(IdMember)
-    EndIf
-  Else
-    SetJSONNull(AddJSONMember(Root, "id"))
-  EndIf
-  Protected ErrObj.i = AddJSONMember(Root, "error")
-  SetJSONObject(ErrObj)
-  SetJSONInteger(AddJSONMember(ErrObj, "code"), Code)
-  SetJSONString(AddJSONMember(ErrObj, "message"), Msg)
-  SendResponse(J)
-EndProcedure
-
-Procedure AttachResultPayload(ResultObj.i, ContentText.s, IsError.i)
-  Protected ContentArr.i = AddJSONMember(ResultObj, "content")
-  SetJSONArray(ContentArr)
-  Protected ItemObj.i = AddJSONElement(ContentArr)
-  SetJSONObject(ItemObj)
-  SetJSONString(AddJSONMember(ItemObj, "type"), "text")
-  SetJSONString(AddJSONMember(ItemObj, "text"), ContentText)
-  SetJSONBoolean(AddJSONMember(ResultObj, "isError"), IsError)
-EndProcedure
-
-; ---------------------------------------------------------------------------
-; Traitement d'une requete JSON-RPC
-; ---------------------------------------------------------------------------
-Procedure ProcessRequest(Line.s)
-  Protected ReqJSON.i = ParseJSON(#PB_Any, Line)
-  If Not ReqJSON
-    SendRawError(#Null, -32700, "Parse error: invalid JSON")
-    ProcedureReturn
-  EndIf
-
-  Protected RootVal.i = JSONValue(ReqJSON)
-  If JSONType(RootVal) <> #PB_JSON_Object
-    FreeJSON(ReqJSON)
-    SendRawError(#Null, -32600, "Invalid Request: Root must be an object")
-    ProcedureReturn
-  EndIf
-
-  Protected MethodMember.i = GetJSONMember(RootVal, "method")
-  Protected Method.s = ""
-  If MethodMember And JSONType(MethodMember) = #PB_JSON_String
-    Method = GetJSONString(MethodMember)
-  EndIf
-
-  Protected IdMember.i = GetJSONMember(RootVal, "id")
-
-  If Method = "notifications/initialized"
-    FreeJSON(ReqJSON)
-    ProcedureReturn
-  EndIf
-
-  ; tools/list
-  If Method = "tools/list"
-    Protected CatalogJSON.i = BuildToolsCatalog()
-    Protected IdValStr.s = "null"
-    If IdMember
-      If JSONType(IdMember) = #PB_JSON_String
-        IdValStr = Chr(34) + GetJSONString(IdMember) + Chr(34)
-      ElseIf JSONType(IdMember) = #PB_JSON_Number
-        IdValStr = Str(GetJSONInteger(IdMember))
-      EndIf
-    EndIf
-    Protected Body.s = ComposeJSON(CatalogJSON)
-    SendRawLine(Chr(123) + Chr(34) + "jsonrpc" + Chr(34) + ":" + Chr(34) + "2.0" + Chr(34) + "," + Chr(34) + "id" + Chr(34) + ":" + IdValStr + "," + Chr(34) + "result" + Chr(34) + ":" + Body + Chr(125))
-    FreeJSON(CatalogJSON)
-    FreeJSON(ReqJSON)
-    ProcedureReturn
-  EndIf
-
-  Protected RespJSON.i = CreateJSON(#PB_Any)
-  Protected RespRoot.i = SetJSONObject(JSONValue(RespJSON))
-  SetJSONString(AddJSONMember(RespRoot, "jsonrpc"), "2.0")
-
-  Protected ResId.i = AddJSONMember(RespRoot, "id")
-  If IdMember
-    If JSONType(IdMember) = #PB_JSON_String
-      SetJSONString(ResId, GetJSONString(IdMember))
-    ElseIf JSONType(IdMember) = #PB_JSON_Number
-      SetJSONDouble(ResId, GetJSONDouble(IdMember))
-    Else
-      SetJSONNull(ResId)
-    EndIf
-  Else
-    SetJSONNull(ResId)
-  EndIf
-
-  Protected ResultObj.i = AddJSONMember(RespRoot, "result")
-  SetJSONObject(ResultObj)
-
-  Select Method
-    Case "initialize"
-      SetJSONString(AddJSONMember(ResultObj, "protocolVersion"), "2024-11-05")
-      Protected Caps.i = AddJSONMember(ResultObj, "capabilities")
-      SetJSONObject(Caps)
-      SetJSONObject(AddJSONMember(Caps, "tools"))
-      Protected ServerInfo.i = AddJSONMember(ResultObj, "serverInfo")
-      SetJSONObject(ServerInfo)
-      SetJSONString(AddJSONMember(ServerInfo, "name"), "FetchMCPServer-PureBasic")
-      SetJSONString(AddJSONMember(ServerInfo, "version"), "1.0.0")
-
-    Case "tools/call"
-      Protected ParamsMember.i = GetJSONMember(RootVal, "params")
-      Protected ToolName.s = ""
-      Protected ArgsMember.i = #Null
-      If ParamsMember And JSONType(ParamsMember) = #PB_JSON_Object
-        ToolName = GetArgString(ParamsMember, "name")
-        ArgsMember = GetJSONMember(ParamsMember, "arguments")
-      EndIf
-
-      Protected OutputStr.s = ""
-      Protected IsErr.i = #False
-
-      Select ToolName
-        Case "fetch"
-          OutputStr = ToolFetch(ArgsMember)
-          If Left(OutputStr, 7) = "ERREUR:"
-            IsErr = #True
-          EndIf
-        Default
-          OutputStr = "Outil inconnu : " + ToolName
-          IsErr = #True
-      EndSelect
-
-      AttachResultPayload(ResultObj, OutputStr, IsErr)
-
+Procedure.s ToolDispatch(ToolName.s, ArgsObj.i, *IsError.Integer)
+  Select ToolName
+    Case "fetch"
+      ProcedureReturn ToolFetch(ArgsObj)
     Default
+      *IsError\i = #True
+      ProcedureReturn "Outil inconnu : " + ToolName
   EndSelect
-
-  SendResponse(RespJSON)
-  FreeJSON(ReqJSON)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
-; Boucle principale
+; Programme principal
 ; ---------------------------------------------------------------------------
-CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-  If hKernel32 = 0 Or Std_GetHandle = 0 Or Std_ReadFile = 0 Or Std_WriteFile = 0
-    End 1
-  EndIf
-CompilerEndIf
+G_ServerName = "FetchMCPServer-PureBasic"
+G_ServerVersion = "1.0.0"
+*G_ToolHandler = @ToolDispatch()
+*G_CatalogBuilder = @BuildToolsCatalog()
 
-Define Line.s
-While #True
-  Line = ReadStdinLine()
-  If Line = "" And G_EOF
-    Break
-  EndIf
-  Line = Trim(Line)
-  If Line <> ""
-    ProcessRequest(Line)
-  EndIf
-Wend
+If Not CheckStdio()
+  End 1
+EndIf
+
+MCPMainLoop()
 
 End
