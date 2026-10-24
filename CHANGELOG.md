@@ -2,7 +2,7 @@
 
 Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [1.0.0] - 2026-10-24
 
 ### Ajouté (Phase 6 — consolidation)
 - **`tests/test_robustness.py`** : T6.1 charge stdio (500 requêtes par
@@ -198,9 +198,9 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
   (réseau auto-initialisé), remplacement de `RepeatString()` inexistant,
   déclarations anticipées (`Declare`) pour `GetArgString`/`GetArgInt`/`GetArgBool`.
 
-## [1.0.0] - 2026-10-23
+### Version initiale (fileMCP, 2026-10-23)
 
-### Ajouté
+### Ajouté (version initiale)
 - Serveur MCP (Model Context Protocol) de gestion de fichiers en PureBasic :
   transport JSON-RPC 2.0 sur stdin/stdout, 100 % natif, multi-plateforme
   (Windows, Linux, macOS).
@@ -216,7 +216,7 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 - Harnais de tests fonctionnels `tests/test_mcp.py` (17 tests : outils +
   cas de sécurité).
 
-### Corrigé
+### Corrigé (version initiale)
 - Compilation Windows : couche E/S stdio via kernel32
   (`ReadFile` / `WriteFile` / `FlushFileBuffers` chargés dynamiquement).
 - `isError` MCP fiable : détection étendue (`introuvable`, `refusee`,
