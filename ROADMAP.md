@@ -5,8 +5,10 @@ Cette feuille de route couvre la suite.
 
 ## Prochaines étapes
 
-- Publier une version **v1.0.0** (tag + GitHub Releases) après validation
-  Linux/macOS.
+- **v1.0.0 publiée** (tag + [GitHub Release](https://github.com/mickael-cala/MCP-file-PB/releases/tag/v1.0.0),
+  binaires Windows + SHA256SUMS).
+- Valider la compilation et les tests sur **Linux et macOS**, puis publier
+  les binaires correspondants dans la release ou en v1.0.1.
 
 ## Court terme
 
