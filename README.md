@@ -1,6 +1,6 @@
-# MCP-servers-PB — Serveurs MCP en PureBasic
+# MCPserver-StdioSuite — 8 serveurs MCP en PureBasic
 
-[![Release](https://img.shields.io/github/v/release/mickael-cala/MCP-file-PB)](https://github.com/mickael-cala/MCP-file-PB/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/mickael-cala/MCPserver-StdioSuite)](https://github.com/mickael-cala/MCPserver-StdioSuite/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Huit serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) écrits en **PureBasic**, 100 % natifs, qui exposent **45 outils** à un client IA (Claude Desktop, Kimi Code, etc.) via **JSON-RPC 2.0 sur stdin/stdout** :
 

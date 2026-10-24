@@ -241,4 +241,4 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 - `isError` MCP fiable : détection étendue (`introuvable`, `refusee`,
   `depasse`).
 
-[1.0.0]: https://github.com/mickael-cala/MCP-file-PB/releases/tag/v1.0.0
+[1.0.0]: https://github.com/mickael-cala/MCPserver-StdioSuite/releases/tag/v1.0.0

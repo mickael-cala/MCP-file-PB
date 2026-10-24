@@ -27,7 +27,7 @@ Comportements inacceptables :
 ## Application
 
 Les instances de comportement abusif peuvent être signalées aux
-responsables du projet via les [issues GitHub](https://github.com/mickael-cala/MCP-file-PB/issues)
+responsables du projet via les [issues GitHub](https://github.com/mickael-cala/MCPserver-StdioSuite/issues)
 ou par les moyens de contact listés dans le profil du détenteur du dépôt.
 Toutes les plaintes seront examinées et feront l'objet d'une réponse
 appropriée.

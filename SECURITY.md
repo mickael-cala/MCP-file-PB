@@ -5,7 +5,7 @@
 **Ne publiez pas de vulnérabilité dans les issues publiques.**
 
 Ouvrez plutôt un avis de sécurité privé via
-[GitHub Security Advisories](https://github.com/mickael-cala/MCP-file-PB/security/advisories/new)
+[GitHub Security Advisories](https://github.com/mickael-cala/MCPserver-StdioSuite/security/advisories/new)
 (contact : `mickael-cala`). Vous recevrez une réponse sous quelques jours ;
 une correction sera publiée avant toute divulgation publique.
 

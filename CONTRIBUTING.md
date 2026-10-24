@@ -8,7 +8,7 @@ variables d'environnement dans [README.md](README.md).
 
 ## Signaler un bug ou proposer une fonctionnalité
 
-Utilisez les [issues GitHub](https://github.com/mickael-cala/MCP-file-PB/issues)
+Utilisez les [issues GitHub](https://github.com/mickael-cala/MCPserver-StdioSuite/issues)
 avec les modèles fournis (bug, fonctionnalité). Incluez si possible :
 
 - le système d'exploitation et la version de PureBasic ;
