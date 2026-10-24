@@ -34,6 +34,7 @@ COMPILE_UT=1
 "$PBC" tests/test_common.pb /EXE "build/test_common" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 "$PBC" tests/test_memory.pb /EXE "build/test_memory" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 "$PBC" tests/test_database.pb /EXE "build/test_database" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
+"$PBC" tests/test_context7.pb /EXE "build/test_context7" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 if [ "$COMPILE_UT" -eq 1 ]; then
     ok
 else
@@ -62,6 +63,14 @@ if [ -x build/test_database ] && ./build/test_database; then
     ok
 else
     ko "tests unitaires database"
+fi
+
+echo
+echo "=== Tests unitaires Context7 ==="
+if [ -x build/test_context7 ] && ./build/test_context7; then
+    ok
+else
+    ko "tests unitaires context7"
 fi
 
 echo

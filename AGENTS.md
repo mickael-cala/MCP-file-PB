@@ -12,6 +12,7 @@ Serveurs MCP écrits en **PureBasic** (3 exécutables), sources dans `src/` :
 - `MCP-SequentialThinking-PB.pb` — raisonnement séquentiel
 - `memoryMCP.pb` + `memory_core.pbi` — mémoire SQLite (`MCP_MEMORY_DB`)
 - `dbMCP.pb` + `db_core.pbi` — exploration SQL (SQLite + PostgreSQL optionnel, lecture seule par defaut)
+- `context7MCP.pb` + `context7_core.pbi` — documentation Context7 (WinHTTP sous Windows)
 
 Transport **JSON-RPC 2.0 sur stdin/stdout**, une ligne JSON par message.
 Exécutables **console**, 100 % natifs, multi-OS (Windows / Linux / macOS).
@@ -23,7 +24,7 @@ Pas de dépendance externe. Le cœur métier d'un serveur va dans un
 ```bash
 build.bat              # Windows : compile -> build\fileMCP.exe
 ./build.sh             # Linux/macOS : compile -> build/fileMCP
-python tests/test_mcp.py   # tests fonctionnels (56 tests, doit être 56/56)
+python tests/test_mcp.py   # tests fonctionnels (63 tests, doit être 63/63)
 ./clean.sh             # nettoie build/
 ```
 
@@ -76,13 +77,15 @@ src/MCP-Fetch-PB.pb               fetch web
 src/MCP-SequentialThinking-PB.pb  raisonnement sequentiel
 src/memoryMCP.pb + memory_core.pbi  memoire SQLite
 src/dbMCP.pb + db_core.pbi        exploration SQL (sqlite + postgres)
+src/context7MCP.pb + context7_core.pbi  documentation Context7
 src/*.pbi                         fichiers projet IDE PureBasic (fileMCP)
 examples/minimal_server.pb        serveur MCP minimal de demo
-build.bat/build.sh                compilation des 4 serveurs ; clean.* : nettoyage
+build.bat/build.sh                compilation des 6 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
 tests/test_mcp.py                 tests d'integration des 5 serveurs (56 tests)
 tests/test_database.pb           tests unitaires Database (37 tests)
+tests/test_context7.pb           tests unitaires Context7 (19 tests)
 tests/unit_test.pbi + test_common.pb  framework + tests unitaires (24 tests)
 tests/test_memory.pb              tests unitaires Memory (33 tests)
 ```

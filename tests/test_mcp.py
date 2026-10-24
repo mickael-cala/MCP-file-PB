@@ -335,12 +335,69 @@ def run_checks_database(client):
     check("postgres non configure -> erreur", err, text[:120])
 
 
+# ---------------------------------------------------------------------------
+# Suite context7MCP (resolution de bibliotheques + docs Context7)
+# ---------------------------------------------------------------------------
+
+def run_tests_context7():
+    with MCPTestClient(find_binary("context7MCP")) as client:
+        run_checks_context7(client)
+
+
+def run_checks_context7(client):
+    print("\n== Context7 : tools/list ==")
+    names = client.list_tools()
+    check("catalogue = [resolve_library_id, query_docs]",
+          names == ["resolve_library_id", "query_docs"], f"obtenu: {names}")
+
+    print("\n== Context7 : garde-fous (hors ligne) ==")
+    err, text = client.tool_text("resolve_library_id", {"query": ""})
+    check("query vide -> erreur", err, text[:100])
+    err, text = client.tool_text("query_docs", {"libraryId": "", "query": "x"})
+    check("libraryId vide -> erreur", err, text[:100])
+    err, text = client.tool_text("query_docs", {"libraryId": "/react/react", "query": "hooks"})
+    check("cle absente -> consigne explicite", err and "MCP_CONTEXT7_API_KEY" in text, text[:120])
+
+    print("\n== Context7 : API live (skip si hors ligne) ==")
+    err, text = client.tool_text("resolve_library_id", {"query": "react"})
+    if err and "echec reseau" in text:
+        print("  [SKIP] pas d'acces reseau vers context7.com")
+        return
+    check("T3.1 resolve react -> /reactjs/react.dev", not err and "/reactjs/react.dev" in text, text[:120])
+    err, text = client.tool_text("resolve_library_id", {"query": "zzzznonexistentqqq"})
+    check("T3.2 recherche sans resultat", not err and "Aucune bibliotheque" in text, text[:120])
+
+    # T3.5 cle invalide -> 401 propre (le serveur doit etre relance avec la
+    # fausse cle : sous-processus dedie)
+    import subprocess
+    env = os.environ.copy()
+    env["MCP_CONTEXT7_API_KEY"] = "ctx7sk_fausse_cle_de_test_0123456789"
+    with MCPTestClient(find_binary("context7MCP"), env=env) as bad_client:
+        err, text = bad_client.tool_text("query_docs", {"libraryId": "/react/react", "query": "hooks"})
+    check("T3.5 cle invalide -> 401 explicite", err and "401" in text, text[:120])
+
+    # T3.3/T3.8 : seulement avec une vraie cle
+    if os.environ.get("MCP_CONTEXT7_API_KEY", "").startswith("ctx7sk"):
+        err, text = client.tool_text("query_docs", {
+            "libraryId": "/reactjs/react.dev/latest", "query": "useState", "tokens": 500,
+        })
+        check("T3.3 query_docs retourne du contenu", not err and len(text) > 50, text[:120])
+        err, text = client.tool_text("query_docs", {
+            "libraryId": "/reactjs/react.dev/latest", "query": "useState",
+            "tokens": 500, "max_length": 100,
+        })
+        check("T3.8 max_length tronque", not err and "tronque" in text, text[-120:])
+    else:
+        print("  [SKIP] T3.3/T3.8 : definir une vraie MCP_CONTEXT7_API_KEY")
+
+
 SUITES = {
     "fileMCP": run_tests_filemcp,
     "MCP-SequentialThinking-PB": run_tests_sequential,
     "MCP-Fetch-PB": run_tests_fetch,
     "memoryMCP": run_tests_memory,
     "dbMCP": run_tests_database,
+    "context7MCP": run_tests_context7,
 }
 
 

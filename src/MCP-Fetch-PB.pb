@@ -212,7 +212,7 @@ Procedure.s ToolFetch(ArgsObj.i)
     ProcedureReturn "ERREUR: URL invalide ou hote prive/loopback refuse."
   EndIf
 
-  Protected Status.Integer
+  Protected Status.i
   Protected Html.s = HttpGetMemory(SafeUrl, @Status)
   If Status < 200 Or Status >= 300
     ProcedureReturn "ERREUR: echec HTTP (statut " + Str(Status) + ") pour " + SafeUrl

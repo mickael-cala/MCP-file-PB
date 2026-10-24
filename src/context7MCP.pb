@@ -1,0 +1,43 @@
+; ============================================================================
+;  SERVEUR MCP - Context7 (PureBasic Console / Stdio)
+;  Resolution de bibliotheques + documentation via context7.com
+; ============================================================================
+;  Compilation : build.bat / build.sh
+;  Transport   : JSON-RPC 2.0 sur stdin / stdout (delimite par \n)
+;  Config      : MCP_CONTEXT7_API_KEY = cle API (prefixe ctx7sk) ;
+;                query_docs l'exige, resolve_library_id fonctionne sans.
+; ============================================================================
+
+EnableExplicit
+
+IncludeFile "../mcp_common/stdio.pbi"
+IncludeFile "../mcp_common/logging.pbi"
+IncludeFile "../mcp_common/json_helpers.pbi"
+IncludeFile "../mcp_common/protocol.pbi"
+IncludeFile "../mcp_common/jsonrpc.pbi"
+
+IncludeFile "context7_core.pbi"
+
+; ---------------------------------------------------------------------------
+; Programme principal
+; ---------------------------------------------------------------------------
+G_ServerName = "Context7MCPServer-PureBasic"
+G_ServerVersion = "1.0.0"
+
+If Not CheckStdio()
+  End 1
+EndIf
+
+G_C7ApiKey = GetEnvironmentVariable("MCP_CONTEXT7_API_KEY")
+If G_C7ApiKey = ""
+  LogDebug("MCP_CONTEXT7_API_KEY absente : resolve_library_id disponible, query_docs retournera une erreur 401 explicite.")
+Else
+  LogDebug("Cle Context7 chargee (longueur " + Str(Len(G_C7ApiKey)) + ").")
+EndIf
+
+*G_ToolHandler = @C7Dispatch()
+*G_CatalogBuilder = @C7BuildCatalog()
+
+MCPMainLoop()
+
+End

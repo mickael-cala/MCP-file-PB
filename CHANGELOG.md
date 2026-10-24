@@ -4,6 +4,29 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 3 — Context7)
+- **`context7MCP`** : serveur MCP Context7 (`src/context7MCP.pb` +
+  `src/context7_core.pbi`) — outils `resolve_library_id` (recherche,
+  fonctionne sans cle) et `query_docs` (documentation, exige
+  `MCP_CONTEXT7_API_KEY`, prefixe `ctx7sk`).
+- Couche HTTP GET avec en-tetes : **WinHTTP natif** sous Windows
+  (winhttp.dll, `Authorization: Bearer`), HTTP integre PureBasic sous
+  Linux/macOS (cle non supportee -> message explicite).
+- Mapping d'erreurs : 401 cle, 429 quota, 5xx indisponible, echec reseau,
+  sans cle -> consigne explicite avant tout appel (l'API renvoie un 400
+  trompeur sinon). Troncature locale `max_length`, `tokens` upstream.
+- `tests/test_context7.pb` : 19 tests unitaires hors ligne.
+- Suite d'integration live dans `tests/test_mcp.py` (skip propre hors
+  ligne, 401 avec fausse cle) : **63 tests au total**.
+- `build`/`run_all` : 6 serveurs, 4 suites de tests unitaires (8 etapes).
+
+### Corrigé
+- **Bug latent pre-existant** : `Protected Status.Integer` (structure) utilise
+  comme scalaire dans `ToolFetch` (MCP-Fetch-PB) — `Str(Status)` imprimait
+  l'adresse de la structure, et les comparaisons de statut HTTP etaient
+  fausses (toujours vraies). Corrige en `Protected Status.i` avec passage
+  `@Status` au pointeur type `*OutStatus.Integer`.
+
 ### Ajouté (Phase 2 — Database)
 - **`dbMCP`** : serveur MCP d'exploration SQL (`src/dbMCP.pb` + `src/db_core.pbi`)
   — 5 outils : `db_list_schemas`, `db_list_tables`, `db_describe_table`,

@@ -9,6 +9,7 @@ Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) �
 | **MCP-SequentialThinking-PB** | `src/MCP-SequentialThinking-PB.pb` | `sequential_thinking` | Raisonnement séquentiel structuré (étapes, révisions, branches) |
 | **memoryMCP** | `src/memoryMCP.pb` + `src/memory_core.pbi` | 9 outils | Graphe d'entites persistant en SQLite (`MCP_MEMORY_DB`) : entites, observations, relations |
 | **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) + PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`) |
+| **context7MCP** | `src/context7MCP.pb` + `src/context7_core.pbi` | 2 outils | Résolution de bibliothèques et documentation via l'API [Context7](https://context7.com) |
 
 Caractéristiques communes :
 
@@ -75,6 +76,15 @@ La base est un fichier SQLite créé automatiquement (chemin : `MCP_MEMORY_DB`, 
 
 Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/`EXPLAIN`/`DESCRIBE` passent ; toute écriture exige `MCP_DB_ALLOW_WRITE=1` et est journalisée sur stderr en cas de refus. La connexion PostgreSQL impose `statement_timeout=30s`. Les résultats JSON préservent les NULL (`CheckDatabaseNull`) et typent entiers/flottants.
 
+### context7MCP — documentation de bibliothèques (Context7)
+
+| Outil | Description | Paramètres |
+|---|---|---|
+| `resolve_library_id` | Recherche une bibliothèque, retourne les identifiants `/owner/repo` (fonctionne sans clé) | `query`, `libraryType` (défaut `oss`) |
+| `query_docs` | Retourne la documentation d'une bibliothèque (**clé API requise** : `MCP_CONTEXT7_API_KEY`, préfixe `ctx7sk`) | `libraryId`, `query`, `tokens` (défaut 5000), `topic` (optionnel), `max_length` (troncature locale, défaut 10000) |
+
+HTTP : couche WinHTTP native sous Windows (en-têtes `Authorization` supportées) ; HTTP intégré PureBasic sous Linux/macOS (clé non supportée → message explicite). Erreurs mappées proprement : 401 clé, 429 quota, 5xx indisponible, échec réseau. Les tests live sont ignorés hors ligne.
+
 ⚠️ **Attention** : `write_file`, `delete_file`, `move_file` et `change_root` sont des opérations destructrices ou sensibles. Ne connectez ce serveur qu'à un répertoire dont la perte de contenu serait acceptable.
 
 ## Sécurité
@@ -87,6 +97,7 @@ Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/
 | `MCP_DB_PATH` | Fichier SQLite exploré par dbMCP (créé si absent). Défaut : `database.db`. | dbMCP |
 | `MCP_DB_POSTGRES_DSN` | Chaîne de connexion PostgreSQL (ex. `host=localhost dbname=test`). Si absente, l'engine `postgres` retourne une erreur claire. | dbMCP |
 | `MCP_DB_ALLOW_WRITE` | `1` = autorise les requêtes d'écriture (INSERT/UPDATE/DELETE/DDL). Défaut : lecture seule. | dbMCP |
+| `MCP_CONTEXT7_API_KEY` | Clé API Context7 (préfixe `ctx7sk`, https://context7.com). Requise par `query_docs` ; `resolve_library_id` fonctionne sans. | context7MCP |
 
 Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils tentent de sortir de la racine autorisée. Voir [SECURITY.md](SECURITY.md).
 
@@ -101,7 +112,7 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ./build.sh     # Linux/macOS -> memes noms sans extension
 ```
 
-Les scripts compilent les 5 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+Les scripts compilent les 6 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 
@@ -129,11 +140,11 @@ run_all.bat        # ou ./run_all.sh : tout verifier
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
-python tests/test_mcp.py                          # les 5 serveurs
+python tests/test_mcp.py                          # les 6 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-56 tests au total (PostgreSQL conditionnel). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
+63 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -191,17 +202,21 @@ src/
 ├── MCP-SequentialThinking-PB.pb  # Serveur raisonnement sequentiel
 ├── memoryMCP.pb                  # Serveur memoire (main)
 ├── memory_core.pbi               # Coeur metier Memory (SQLite, testable)
+├── dbMCP.pb                      # Serveur Database (main)
+├── db_core.pbi                   # Coeur metier Database (SQLite/PostgreSQL)
+├── context7MCP.pb                # Serveur Context7 (main)
+├── context7_core.pbi             # Coeur metier Context7 (WinHTTP/Linux)
 ├── fileMCP_Windows.pbi           # Projet IDE PureBasic — Windows
 ├── fileMCP_Linux.pbi             # Projet IDE PureBasic — Linux
 └── fileMCP_macOS.pbi             # Projet IDE PureBasic — macOS
 
 examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
-build.bat / build.sh        # Compilation des 3 serveurs (sortie dans build/)
+build.bat / build.sh        # Compilation des 6 serveurs (sortie dans build/)
 clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
-├── test_mcp.py             # Tests fonctionnels des 5 serveurs (56 tests)
+├── test_mcp.py             # Tests fonctionnels des 6 serveurs (63 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
 └── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
