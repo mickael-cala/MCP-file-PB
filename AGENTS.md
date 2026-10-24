@@ -5,10 +5,15 @@ qui travaillent sur ce dépôt.
 
 ## Vue d'ensemble
 
-Serveur MCP de gestion de fichiers écrit en **PureBasic**, un seul fichier
-source : `src/fileMCP.pb` (~850 lignes). Transport **JSON-RPC 2.0 sur
-stdin/stdout**, une ligne JSON par message. Exécutable **console**, 100 %
-natif, multi-OS (Windows / Linux / macOS). Pas de dépendance externe.
+Serveurs MCP écrits en **PureBasic** (3 exécutables), sources dans `src/` :
+
+- `fileMCP.pb` — gestion de fichiers confinée (`MCP_ROOT`/`MCP_ROOT_SECRET`)
+- `MCP-Fetch-PB.pb` — fetch web (HTML → Markdown, protection SSRF)
+- `MCP-SequentialThinking-PB.pb` — raisonnement séquentiel
+
+Transport **JSON-RPC 2.0 sur stdin/stdout**, une ligne JSON par message.
+Exécutables **console**, 100 % natifs, multi-OS (Windows / Linux / macOS).
+Pas de dépendance externe.
 
 ## Commandes essentielles
 
@@ -54,10 +59,12 @@ Le compilateur est cherché via `PBCOMPILER`, `C:\Program Files\PureBasic\Compil
 ## Structure
 
 ```
-src/fileMCP.pb       source unique (multi-OS)
-src/*.pbi            fichiers projet IDE PureBasic par OS
-build.bat/build.sh   compilation ; clean.bat/clean.sh : nettoyage
-tests/test_mcp.py    harnais de tests stdio
+src/fileMCP.pb                    gestion de fichiers
+src/MCP-Fetch-PB.pb               fetch web
+src/MCP-SequentialThinking-PB.pb  raisonnement sequentiel
+src/*.pbi                         fichiers projet IDE PureBasic (fileMCP)
+build.bat/build.sh                compilation des 3 serveurs ; clean.* : nettoyage
+tests/test_mcp.py                 harnais de tests stdio (26 tests)
 ```
 
 Voir aussi : [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md),

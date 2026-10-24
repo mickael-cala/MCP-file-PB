@@ -2,6 +2,24 @@
 
 Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- **MCP-Fetch-PB** : serveur MCP de récupération web (`src/MCP-Fetch-PB.pb`) —
+  outil `fetch` (URL → Markdown, HTML brut en option), protection SSRF
+  (HTTP/HTTPS uniquement, IPs littérales refusées), timeout.
+- **MCP-SequentialThinking-PB** : serveur MCP de raisonnement séquentiel
+  (`src/MCP-SequentialThinking-PB.pb`) — outil `sequential_thinking`
+  (étapes, révisions, branches, état courant en JSON).
+- `build.bat` / `build.sh` compilent désormais les 3 serveurs.
+- Tests étendus à 26 (catalogues et outils des 3 serveurs, cas d'erreur
+  fetch hors ligne).
+
+### Corrigé
+- Compilation PureBasic 6.41 des nouveaux serveurs : retrait d'`InitNetwork()`
+  (réseau auto-initialisé), remplacement de `RepeatString()` inexistant,
+  déclarations anticipées (`Declare`) pour `GetArgString`/`GetArgInt`/`GetArgBool`.
+
 ## [1.0.0] - 2026-10-23
 
 ### Ajouté

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  build.sh - Compile le serveur MCP (PureBasic) pour Linux / macOS
+#  build.sh - Compile les 3 serveurs MCP (PureBasic) pour Linux / macOS
 #  Le compilateur est cherche dans l'ordre :
 #    1. variable d'environnement PBCOMPILER
 #    2. pbcompiler dans le PATH
@@ -8,9 +8,6 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-
-SRC="src/fileMCP.pb"
-OUT="build/fileMCP"
 
 PBC="${PBCOMPILER:-}"
 if [ -z "$PBC" ]; then
@@ -25,7 +22,9 @@ fi
 
 mkdir -p build
 
-echo "Compilation de $SRC ..."
-"$PBC" "$SRC" /EXE "$OUT" /CONSOLE /UNICODE /THREAD
+for SRC in fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB; do
+    echo "Compilation de src/$SRC.pb ..."
+    "$PBC" "src/$SRC.pb" /EXE "build/$SRC" /CONSOLE /UNICODE /THREAD
+done
 
-echo "[OK] Executable genere : $OUT"
+echo "[OK] Executables generes dans build/"

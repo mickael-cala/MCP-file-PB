@@ -1,16 +1,13 @@
 @echo off
 setlocal
 rem ============================================================================
-rem  build.bat - Compile le serveur MCP (PureBasic) pour Windows
+rem  build.bat - Compile les 3 serveurs MCP (PureBasic) pour Windows
 rem  Le compilateur est cherche dans l'ordre :
 rem    1. variable d'environnement PBCOMPILER
 rem    2. C:\Program Files\PureBasic\Compilers\pbcompiler.exe (installation par defaut)
 rem    3. C:\PureBasic\Compilers\pbcompiler.exe
 rem    4. pbcompiler.exe dans le PATH
 rem ============================================================================
-
-set "SRC=src\fileMCP.pb"
-set "OUT=build\fileMCP.exe"
 
 set "PBC="
 if defined PBCOMPILER set "PBC=%PBCOMPILER%"
@@ -26,11 +23,13 @@ if not defined PBC (
 
 if not exist build mkdir build
 
-echo Compilation de %SRC% ...
-"%PBC%" "%SRC%" /EXE "%OUT%" /CONSOLE /UNICODE /THREAD
-if errorlevel 1 (
-    echo [ERREUR] Echec de la compilation.
-    exit /b 1
+for %%S in (fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB) do (
+    echo Compilation de src\%%S.pb ...
+    "%PBC%" "src\%%S.pb" /EXE "build\%%S.exe" /CONSOLE /UNICODE /THREAD
+    if errorlevel 1 (
+        echo [ERREUR] Echec de la compilation de %%S.
+        exit /b 1
+    )
 )
 
-echo [OK] Executable genere : %OUT%
+echo [OK] Executables generes dans build\
