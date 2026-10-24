@@ -28,7 +28,7 @@
 
 ## Résultats des tests
 
-Dernière exécution de `run_all.bat` : **6/6 étapes** — tests unitaires
-24 + 33 + 37 réussis (mcp_common, Memory, Database), tests d'intégration
-**56/56** (5 serveurs ; les tests PostgreSQL sont ignorés sans
-`MCP_DB_POSTGRES_TEST_DSN`).
+Dernière exécution de `run_all.bat` : **8/8 étapes** — tests unitaires
+24 + 33 + 37 + 19 + 24 réussis (mcp_common, Memory, Database, Context7,
+Git), tests d'intégration **75/75** (7 serveurs ; PostgreSQL et Context7
+live sont ignorés sans configuration/réseau).

@@ -4,6 +4,29 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 4 — Git)
+- **`gitMCP`** : serveur MCP d'exploration de dépôts git locaux
+  (`src/gitMCP.pb` + `src/git_core.pbi`) — 7 outils : `git_is_repo`,
+  `git_status`, `git_log`, `git_diff`, `git_show`, `git_branches`,
+  `git_blame`.
+- `GitRun()` : sous-processus git via shell avec `2>&1` (l'API Process de
+  PureBasic ne lit pas stderr de façon fiable), lecture en boucle jusqu'à
+  fin du processus, sortie plafonnée à 40 Ko.
+- **Sécurité** : `GitSafeParam()` rejette les métacaractères shell
+  (`; & | < > \` $ ( )` guillemets, retours ligne) sur tous les paramètres
+  (repoPath, refs, chemins) avant exécution ; injection testée.
+- `MCP_GIT_EXE` pour un git hors PATH ; arrêt propre si git absent.
+- `tests/test_git.pb` : 24 tests unitaires (fixture : 4 commits, 2 branches,
+  fichier modifié, chemin avec espaces, cas d'injection).
+- Suite d'intégration Git dans `tests/test_mcp.py` : **75 tests au total**.
+- `build`/`run_all` : 7 serveurs, 5 suites de tests unitaires (9 étapes).
+
+### Corrigé (Phase 4)
+- `cmd.exe /c` : forme `""exe" args"` requise quand la commande commence par
+  un chemin entre guillemets ; arguments en guillemets doubles (validés sans
+  guillemet) pour les chemins avec espaces. `TrimOut()` retire les fins de
+  ligne des sorties git.
+
 ### Ajouté (Phase 3 — Context7)
 - **`context7MCP`** : serveur MCP Context7 (`src/context7MCP.pb` +
   `src/context7_core.pbi`) — outils `resolve_library_id` (recherche,

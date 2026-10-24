@@ -391,6 +391,82 @@ def run_checks_context7(client):
         print("  [SKIP] T3.3/T3.8 : definir une vraie MCP_CONTEXT7_API_KEY")
 
 
+# ---------------------------------------------------------------------------
+# Suite gitMCP (depots locaux)
+# ---------------------------------------------------------------------------
+
+def run_tests_git():
+    import subprocess
+    with tempfile.TemporaryDirectory(prefix="gitmcp-test-") as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+
+        def git(*args):
+            subprocess.run(["git", *args], cwd=repo, check=True,
+                           capture_output=True, text=True)
+
+        git("init", "-q", "-b", "main")
+        git("config", "user.email", "test@example.com")
+        git("config", "user.name", "Tester")
+        (repo / "README.md").write_text("ligne 1\nligne 2\n", encoding="utf-8")
+        git("add", "README.md")
+        git("commit", "-q", "-m", "premier-commit")
+        (repo / "README.md").write_text("ligne 1 modifiee\nligne 2\n", encoding="utf-8")
+        git("add", "README.md")
+        git("commit", "-q", "-m", "deuxieme-commit")
+        git("checkout", "-q", "-b", "feature")
+        (repo / "f.txt").write_text("feature\n", encoding="utf-8")
+        git("add", "f.txt")
+        git("commit", "-q", "-m", "commit-feature")
+        git("checkout", "-q", "main")
+        (repo / "espace.txt").write_text("a\nb\n", encoding="utf-8")
+        git("add", "espace.txt")
+        git("commit", "-q", "-m", "troisieme-commit")
+        (repo / "README.md").write_text("modifie\n", encoding="utf-8")
+
+        with MCPTestClient(find_binary("gitMCP")) as client:
+            run_checks_git(client, str(repo))
+
+
+def run_checks_git(client, repo):
+    print("\n== Git : tools/list ==")
+    names = client.list_tools()
+    expected = {"git_is_repo", "git_status", "git_log", "git_diff",
+                "git_show", "git_branches", "git_blame"}
+    check("tools/list retourne 7 outils", len(names) == 7, f"obtenu: {names}")
+    check("catalogue conforme", set(names) == expected, f"diff: {set(names) ^ expected}")
+
+    print("\n== Git : lecture du depot ==")
+    err, text = client.tool_text("git_is_repo", {"repoPath": repo})
+    check("git_is_repo true", not err and text.strip() == "true", text[:80])
+
+    err, text = client.tool_text("git_status", {"repoPath": repo})
+    check("status voit README.md modifie", not err and "README.md" in text, text[:120])
+
+    err, text = client.tool_text("git_log", {"repoPath": repo, "count": 1})
+    check("log count=1", not err and "troisieme-commit" in text, text[:120])
+
+    err, text = client.tool_text("git_diff", {"repoPath": repo, "refA": "HEAD~1", "refB": "HEAD"})
+    check("diff HEAD~1..HEAD", not err and "espace.txt" in text, text[:120])
+
+    err, text = client.tool_text("git_show", {"repoPath": repo, "ref": "HEAD", "path": "espace.txt"})
+    check("show fichier", not err and "a" in text, text[:80])
+
+    err, text = client.tool_text("git_branches", {"repoPath": repo})
+    check("branches main + feature", not err and "main" in text and "feature" in text, text[:120])
+
+    err, text = client.tool_text("git_blame", {"repoPath": repo, "path": "espace.txt", "startLine": 1, "endLine": 2})
+    check("blame 2 lignes", not err and len([l for l in text.strip().splitlines() if l.strip()]) == 2, text[:120])
+
+    print("\n== Git : securite ==")
+    err, text = client.tool_text("git_log", {"repoPath": repo + "; rm -rf /", "count": 1})
+    check("repoPath injecte rejete", err, text[:120])
+    err, text = client.tool_text("git_diff", {"repoPath": repo, "refA": "HEAD; touch x", "refB": "HEAD"})
+    check("ref injectee rejetee", err, text[:120])
+    err, text = client.tool_text("git_log", {"repoPath": repo + "_absent", "count": 1})
+    check("depot inexistant -> erreur", err, text[:120])
+
+
 SUITES = {
     "fileMCP": run_tests_filemcp,
     "MCP-SequentialThinking-PB": run_tests_sequential,
@@ -398,6 +474,7 @@ SUITES = {
     "memoryMCP": run_tests_memory,
     "dbMCP": run_tests_database,
     "context7MCP": run_tests_context7,
+    "gitMCP": run_tests_git,
 }
 
 

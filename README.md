@@ -10,6 +10,7 @@ Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) �
 | **memoryMCP** | `src/memoryMCP.pb` + `src/memory_core.pbi` | 9 outils | Graphe d'entites persistant en SQLite (`MCP_MEMORY_DB`) : entites, observations, relations |
 | **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) + PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`) |
 | **context7MCP** | `src/context7MCP.pb` + `src/context7_core.pbi` | 2 outils | Résolution de bibliothèques et documentation via l'API [Context7](https://context7.com) |
+| **gitMCP** | `src/gitMCP.pb` + `src/git_core.pbi` | 7 outils | Exploration de dépôts git locaux (status, log, diff, show, branches, blame) |
 
 Caractéristiques communes :
 
@@ -85,6 +86,20 @@ Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/
 
 HTTP : couche WinHTTP native sous Windows (en-têtes `Authorization` supportées) ; HTTP intégré PureBasic sous Linux/macOS (clé non supportée → message explicite). Erreurs mappées proprement : 401 clé, 429 quota, 5xx indisponible, échec réseau. Les tests live sont ignorés hors ligne.
 
+### gitMCP — dépôts git locaux
+
+| Outil | Description | Paramètres |
+|---|---|---|
+| `git_is_repo` | Vérifie qu'un répertoire est un dépôt git | `repoPath` |
+| `git_status` | État du working tree (format porcelain) | `repoPath` |
+| `git_log` | Historique oneline (N derniers commits) | `repoPath`, `count` (défaut 10, max 1000) |
+| `git_diff` | Différences entre deux refs, filtre de chemin optionnel | `repoPath`, `refA`, `refB`, `path` |
+| `git_show` | Contenu d'un fichier à une ref | `repoPath`, `ref`, `path` |
+| `git_branches` | Branches locales ou distantes | `repoPath`, `remote` |
+| `git_blame` | Annotations de lignes | `repoPath`, `path`, `startLine`, `endLine` |
+
+Sécurité : tous les paramètres (chemins, refs) sont validés avant exécution — les métacaractères shell (`;` `&` `|` `<` `>` `` ` `` `$` `(` `)` guillemets, retours ligne) sont rejetés. `MCP_GIT_EXE` permet de pointer un `git.exe` hors PATH ; le serveur refuse de démarrer si git est introuvable.
+
 ⚠️ **Attention** : `write_file`, `delete_file`, `move_file` et `change_root` sont des opérations destructrices ou sensibles. Ne connectez ce serveur qu'à un répertoire dont la perte de contenu serait acceptable.
 
 ## Sécurité
@@ -98,6 +113,7 @@ HTTP : couche WinHTTP native sous Windows (en-têtes `Authorization` supportées
 | `MCP_DB_POSTGRES_DSN` | Chaîne de connexion PostgreSQL (ex. `host=localhost dbname=test`). Si absente, l'engine `postgres` retourne une erreur claire. | dbMCP |
 | `MCP_DB_ALLOW_WRITE` | `1` = autorise les requêtes d'écriture (INSERT/UPDATE/DELETE/DDL). Défaut : lecture seule. | dbMCP |
 | `MCP_CONTEXT7_API_KEY` | Clé API Context7 (préfixe `ctx7sk`, https://context7.com). Requise par `query_docs` ; `resolve_library_id` fonctionne sans. | context7MCP |
+| `MCP_GIT_EXE` | Chemin de l'exécutable git si absent du PATH. | gitMCP |
 
 Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils tentent de sortir de la racine autorisée. Voir [SECURITY.md](SECURITY.md).
 
@@ -112,7 +128,7 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ./build.sh     # Linux/macOS -> memes noms sans extension
 ```
 
-Les scripts compilent les 6 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+Les scripts compilent les 7 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 
@@ -140,11 +156,11 @@ run_all.bat        # ou ./run_all.sh : tout verifier
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
-python tests/test_mcp.py                          # les 6 serveurs
+python tests/test_mcp.py                          # les 7 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-63 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
+75 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -177,6 +193,9 @@ Exemple générique (les trois serveurs) :
       "env": {
         "MCP_DB_PATH": "/chemin/vers/database.db"
       }
+    },
+    "git-pb": {
+      "command": "/chemin/vers/build/gitMCP"
     }
   }
 }
@@ -206,17 +225,19 @@ src/
 ├── db_core.pbi                   # Coeur metier Database (SQLite/PostgreSQL)
 ├── context7MCP.pb                # Serveur Context7 (main)
 ├── context7_core.pbi             # Coeur metier Context7 (WinHTTP/Linux)
+├── gitMCP.pb                     # Serveur Git (main)
+├── git_core.pbi                  # Coeur metier Git (sous-processus git)
 ├── fileMCP_Windows.pbi           # Projet IDE PureBasic — Windows
 ├── fileMCP_Linux.pbi             # Projet IDE PureBasic — Linux
 └── fileMCP_macOS.pbi             # Projet IDE PureBasic — macOS
 
 examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
-build.bat / build.sh        # Compilation des 6 serveurs (sortie dans build/)
+build.bat / build.sh        # Compilation des 7 serveurs (sortie dans build/)
 clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
-├── test_mcp.py             # Tests fonctionnels des 6 serveurs (63 tests)
+├── test_mcp.py             # Tests fonctionnels des 7 serveurs (75 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
 └── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
