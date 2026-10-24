@@ -8,6 +8,7 @@ Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) �
 | **MCP-Fetch-PB** | `src/MCP-Fetch-PB.pb` | `fetch` | Récupération de pages web, conversion HTML → Markdown |
 | **MCP-SequentialThinking-PB** | `src/MCP-SequentialThinking-PB.pb` | `sequential_thinking` | Raisonnement séquentiel structuré (étapes, révisions, branches) |
 | **memoryMCP** | `src/memoryMCP.pb` + `src/memory_core.pbi` | 9 outils | Graphe d'entites persistant en SQLite (`MCP_MEMORY_DB`) : entites, observations, relations |
+| **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) + PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`) |
 
 Caractéristiques communes :
 
@@ -62,6 +63,18 @@ Les URLs non HTTP/HTTPS et les IPs littérales sont refusées (SSRF) ; un timeou
 
 La base est un fichier SQLite créé automatiquement (chemin : `MCP_MEMORY_DB`, défaut `memory.db`). Les noms sont échappés (pas d'injection SQL) et les suppressions d'entités cascadent via les clés étrangères.
 
+### dbMCP — exploration SQL (SQLite + PostgreSQL)
+
+| Outil | Description | Paramètres |
+|---|---|---|
+| `db_list_schemas` | Liste les schémas (`["main"]` pour SQLite, `information_schema.schemata` pour PostgreSQL) | `engine` (défaut `sqlite`) |
+| `db_list_tables` | Liste les tables de la base / du schéma | `engine`, `schema` (PostgreSQL, défaut `public`) |
+| `db_describe_table` | Décrit les colonnes (`PRAGMA table_info` / `information_schema.columns`) | `table`, `engine`, `schema` |
+| `db_execute_query` | Exécute une requête — **lecture seule par défaut**, résultat JSON limité à 1000 lignes | `query`, `engine` |
+| `db_explain` | Plan d'exécution (`EXPLAIN QUERY PLAN` / `EXPLAIN`) | `query`, `engine` |
+
+Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/`EXPLAIN`/`DESCRIBE` passent ; toute écriture exige `MCP_DB_ALLOW_WRITE=1` et est journalisée sur stderr en cas de refus. La connexion PostgreSQL impose `statement_timeout=30s`. Les résultats JSON préservent les NULL (`CheckDatabaseNull`) et typent entiers/flottants.
+
 ⚠️ **Attention** : `write_file`, `delete_file`, `move_file` et `change_root` sont des opérations destructrices ou sensibles. Ne connectez ce serveur qu'à un répertoire dont la perte de contenu serait acceptable.
 
 ## Sécurité
@@ -71,6 +84,9 @@ La base est un fichier SQLite créé automatiquement (chemin : `MCP_MEMORY_DB`, 
 | `MCP_ROOT` | Répertoire racine autorisé pour toutes les opérations. Si absent, le répertoire courant du serveur est utilisé. | fileMCP |
 | `MCP_ROOT_SECRET` | Mot de passe requis par l'outil `change_root` pour modifier la racine autorisée à chaud. | fileMCP |
 | `MCP_MEMORY_DB` | Chemin du fichier SQLite de la mémoire (créé automatiquement si absent). Défaut : `memory.db`. | memoryMCP |
+| `MCP_DB_PATH` | Fichier SQLite exploré par dbMCP (créé si absent). Défaut : `database.db`. | dbMCP |
+| `MCP_DB_POSTGRES_DSN` | Chaîne de connexion PostgreSQL (ex. `host=localhost dbname=test`). Si absente, l'engine `postgres` retourne une erreur claire. | dbMCP |
+| `MCP_DB_ALLOW_WRITE` | `1` = autorise les requêtes d'écriture (INSERT/UPDATE/DELETE/DDL). Défaut : lecture seule. | dbMCP |
 
 Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils tentent de sortir de la racine autorisée. Voir [SECURITY.md](SECURITY.md).
 
@@ -85,7 +101,7 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ./build.sh     # Linux/macOS -> memes noms sans extension
 ```
 
-Les scripts compilent les 4 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+Les scripts compilent les 5 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 
@@ -109,15 +125,15 @@ run_all.bat        # ou ./run_all.sh : tout verifier
   `tests/test_memory.pb` (33 tests sur le serveur Memory). Chaque futur module
   ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
-  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (44 tests qui
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (56 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
-python tests/test_mcp.py                          # les 4 serveurs
+python tests/test_mcp.py                          # les 5 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-44 tests au total. Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
+56 tests au total (PostgreSQL conditionnel). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -143,6 +159,12 @@ Exemple générique (les trois serveurs) :
       "command": "/chemin/vers/build/memoryMCP",
       "env": {
         "MCP_MEMORY_DB": "/chemin/vers/memory.db"
+      }
+    },
+    "db-pb": {
+      "command": "/chemin/vers/build/dbMCP",
+      "env": {
+        "MCP_DB_PATH": "/chemin/vers/database.db"
       }
     }
   }
@@ -179,7 +201,7 @@ clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
-├── test_mcp.py             # Tests fonctionnels des 4 serveurs (44 tests)
+├── test_mcp.py             # Tests fonctionnels des 5 serveurs (56 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
 └── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)

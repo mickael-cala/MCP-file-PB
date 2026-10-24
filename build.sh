@@ -22,7 +22,7 @@ fi
 
 mkdir -p build
 
-for SRC in fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB memoryMCP; do
+for SRC in fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB memoryMCP dbMCP; do
     echo "Compilation de src/$SRC.pb ..."
     "$PBC" "src/$SRC.pb" /EXE "build/$SRC" /CONSOLE /UNICODE /THREAD
 done

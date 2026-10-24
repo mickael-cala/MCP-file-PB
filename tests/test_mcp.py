@@ -260,11 +260,87 @@ def run_checks_memory(client):
     check("Alice supprimee (cascade)", not err and '"entities":[]' in compact, text[:120])
 
 
+# ---------------------------------------------------------------------------
+# Suite dbMCP (exploration SQL, SQLite + PostgreSQL optionnel)
+# ---------------------------------------------------------------------------
+
+def run_tests_database():
+    with tempfile.TemporaryDirectory(prefix="dbmcp-test-") as tmp:
+        env = {"MCP_DB_PATH": str(Path(tmp) / "test.db")}
+        with MCPTestClient(find_binary("dbMCP"), env=env) as client:
+            run_checks_database(client)
+        run_checks_database_postgres(env)
+
+
+def run_checks_database_postgres(base_env):
+    """T2.9-T2.12 : executes uniquement si un DSN PostgreSQL de test est fourni."""
+    print("\n== Database : PostgreSQL (T2.9-T2.12) ==")
+    dsn = os.environ.get("MCP_DB_POSTGRES_TEST_DSN")
+    if not dsn:
+        print("  [SKIP] definir MCP_DB_POSTGRES_TEST_DSN pour executer les tests PostgreSQL")
+        return
+    env = dict(base_env)
+    env["MCP_DB_POSTGRES_DSN"] = dsn
+    with MCPTestClient(find_binary("dbMCP"), env=env) as client:
+        err, text = client.tool_text("db_list_schemas", {"engine": "postgres"})
+        check("T2.9 list_schemas retourne public", not err and "public" in text, text[:120])
+        err, text = client.tool_text("db_list_tables", {"engine": "postgres"})
+        check("T2.9b list_tables postgres ok", not err, text[:120])
+        err, text = client.tool_text("db_execute_query", {
+            "engine": "postgres",
+            "query": "SELECT table_name FROM information_schema.tables WHERE table_schema='public' LIMIT 1",
+        })
+        check("T2.12 requete information_schema ok", not err, text[:120])
+    # Connexion invalide : le serveur doit demarrer quand meme et rejeter proprement
+    bad_env = dict(base_env)
+    bad_env["MCP_DB_POSTGRES_DSN"] = "host=127.0.0.1 port=9 dbname=rien connect_timeout=2"
+    with MCPTestClient(find_binary("dbMCP"), env=bad_env) as client:
+        err, text = client.tool_text("db_list_schemas", {"engine": "postgres"})
+        check("T2.11 connexion postgres invalide -> erreur claire, serveur vivant", err, text[:120])
+
+
+def run_checks_database(client):
+    print("\n== Database : tools/list ==")
+    names = client.list_tools()
+    expected = {
+        "db_list_schemas", "db_list_tables", "db_describe_table",
+        "db_execute_query", "db_explain",
+    }
+    check("tools/list retourne 5 outils", len(names) == 5, f"obtenu: {names}")
+    check("catalogue conforme", set(names) == expected, f"diff: {set(names) ^ expected}")
+
+    print("\n== Database : lecture seule (defaut) ==")
+    err, text = client.tool_text("db_execute_query", {"query": "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"})
+    check("CREATE refuse sans MCP_DB_ALLOW_WRITE", err, text[:100])
+    err, text = client.tool_text("db_execute_query", {"query": "INSERT INTO users (name) VALUES ('x')"})
+    check("INSERT refuse", err, text[:100])
+    err, text = client.tool_text("db_execute_query", {"query": "DROP TABLE users"})
+    check("DROP refuse", err, text[:100])
+    err, text = client.tool_text("db_execute_query", {"query": "WITH x AS (SELECT 1) DELETE FROM t"})
+    check("CTE avec DELETE refuse", err, text[:100])
+
+    print("\n== Database : requetes en lecture ==")
+    err, text = client.tool_text("db_execute_query", {"query": "SELECT 1 AS un, 'x' AS t, 2.5 AS f, NULL AS vide"})
+    check("SELECT expression ok", not err, text[:120])
+    check("NULL preserve en JSON", ",null]" in text.replace(" ", ""), text[:120])
+    err, text = client.tool_text("db_execute_query", {"query": "SELECT * FROM table_inexistante"})
+    check("requete invalide -> erreur claire", err, text[:120])
+
+    print("\n== Database : schemas / engine ==")
+    err, text = client.tool_text("db_list_schemas", {})
+    check("sqlite -> [main]", not err and "main" in text, text[:120])
+    err, text = client.tool_text("db_list_tables", {"engine": "moteur_fou"})
+    check("engine invalide -> erreur", err, text[:120])
+    err, text = client.tool_text("db_list_tables", {"engine": "postgres"})
+    check("postgres non configure -> erreur", err, text[:120])
+
+
 SUITES = {
     "fileMCP": run_tests_filemcp,
     "MCP-SequentialThinking-PB": run_tests_sequential,
     "MCP-Fetch-PB": run_tests_fetch,
     "memoryMCP": run_tests_memory,
+    "dbMCP": run_tests_database,
 }
 
 

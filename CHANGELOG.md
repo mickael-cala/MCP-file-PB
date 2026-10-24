@@ -4,6 +4,29 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 2 — Database)
+- **`dbMCP`** : serveur MCP d'exploration SQL (`src/dbMCP.pb` + `src/db_core.pbi`)
+  — 5 outils : `db_list_schemas`, `db_list_tables`, `db_describe_table`,
+  `db_execute_query`, `db_explain`. SQLite integre (`MCP_DB_PATH`) +
+  PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`, `statement_timeout=30s`),
+  selection par parametre `engine`.
+- Garde-fou lecture seule : `IsReadOnlyQuery` (whitelist SELECT/WITH/SHOW/
+  EXPLAIN/DESCRIBE, commentaires sautés, verbes d'ecriture rejetes dans les
+  CTE) ; ecriture reservee a `MCP_DB_ALLOW_WRITE=1` ; refus journalises sur
+  stderr. Resultats JSON <= 1000 lignes, NULL preserves via `CheckDatabaseNull`.
+- `tests/test_database.pb` : 37 tests unitaires (T2.1-T2.8 + batterie
+  IsReadOnlyQuery). Tests PostgreSQL T2.9-T2.12 conditionnels
+  (`MCP_DB_POSTGRES_TEST_DSN`), sinon [SKIP] explicite.
+- Suite d'integration Database dans `tests/test_mcp.py` : **56 tests au total**.
+- `build`/`run_all` : 5 serveurs, 3 suites de tests unitaires (7 etapes).
+
+### Notes / ecarts au plan
+- PostgreSQL via `UsePostgreSQLDatabase()` (driver integre PB) au lieu de
+  prototypes libpq bruts : pas de `PQexecParams` (pas de binding de
+  parametres dans l'API Database PB) — l'injection est contenue par la
+  whitelist lecture seule et l'echappement des chaines internes.
+- T2.12 (binding) remplace par un test de requete information_schema.
+
 ### Ajouté (Phase 1 — Memory/SQLite)
 - **`memoryMCP`** : serveur MCP de mémoire persistante (`src/memoryMCP.pb` +
   `src/memory_core.pbi`) — 9 outils : `create_entities`, `create_relations`,
