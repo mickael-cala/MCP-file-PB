@@ -19,3 +19,6 @@ __pycache__/
 
 # Rapports de tests generes
 tests/report.html
+
+# Repertoire de tests temporaires locaux
+tmp-test/
