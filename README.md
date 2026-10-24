@@ -187,9 +187,9 @@ run_all.bat        # ou ./run_all.sh : tout verifier
 ```
 
 - **Unitaires (PureBasic)** : `tests/unit_test.pbi` (micro-framework) +
-  `tests/test_common.pb` (24 tests sur `mcp_common/`) et
-  `tests/test_memory.pb` (33 tests sur le serveur Memory). Chaque futur module
-  ajoute un `tests/test_<module>.pb`.
+  6 suites (`tests/test_common.pb` 24, `test_memory.pb` 33, `test_database.pb`
+  37, `test_context7.pb` 19, `test_git.pb` 24, `test_github.pb` 40 — soit
+  177 tests/hors réseau). Chaque futur module ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
   validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (100 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
@@ -199,7 +199,8 @@ python tests/test_mcp.py                          # les 8 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne).
+100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne,
+GitHub via mock local). Validés sous **Windows et Linux (WSL2)**.
 
 - **Robustesse et performances (Phase 6)** : `tests/test_robustness.py` —
   17 vérifications (charge stdio, JSON 1 Mo, JSON malformé, EOF brutal,
@@ -281,7 +282,7 @@ src/
 ├── dbMCP.pb                      # Serveur Database (main)
 ├── db_core.pbi                   # Coeur metier Database (SQLite/PostgreSQL)
 ├── context7MCP.pb                # Serveur Context7 (main)
-├── context7_core.pbi             # Coeur metier Context7 (WinHTTP/Linux)
+├── context7_core.pbi             # Coeur metier Context7 (WinHTTP / curl)
 ├── gitMCP.pb                     # Serveur Git (main)
 ├── git_core.pbi                  # Coeur metier Git (sous-processus git)
 ├── githubMCP.pb                  # Serveur GitHub (main)
@@ -292,6 +293,7 @@ examples/mcp.json           # Configuration client MCP complete (8 serveurs)
 build.bat / build.sh        # Compilation des 8 serveurs (sortie dans build/)
 clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
+.gitattributes              # Fins de ligne (LF scripts/sources, CRLF .bat)
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
 ├── mock_github.py          # Mock local de l'API GitHub (integration)
@@ -302,7 +304,10 @@ tests/
 ├── test_database.pb        # Tests unitaires du serveur Database (37 tests)
 ├── test_context7.pb        # Tests unitaires du serveur Context7 (19 tests)
 ├── test_git.pb             # Tests unitaires du serveur Git (24 tests)
-└── test_github.pb          # Tests unitaires du serveur GitHub (40 tests)
+├── test_github.pb          # Tests unitaires du serveur GitHub (40 tests)
+├── test_robustness.py      # Robustesse T6.1-T6.8 + performances T6.9-T6.14
+├── make_report.py          # Genere report.html depuis report.json
+└── report.json             # Stats par serveur (genere, ignore par git)
 ```
 
 Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), renseignez les hooks `*G_ToolHandler` / `*G_CatalogBuilder` et appelez `MCPMainLoop()`.

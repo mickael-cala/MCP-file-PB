@@ -1,21 +1,15 @@
 # Feuille de route
 
-Les phases 0 à 6 du plan de développement sont terminées (voir [PLAN.md](PLAN.md)).
-Cette feuille de route couvre la suite.
-
-## Prochaines étapes
-
-- **v1.0.0 publiée** (tag + [GitHub Release](https://github.com/mickael-cala/MCP-file-PB/releases/tag/v1.0.0),
-  binaires Windows + SHA256SUMS).
-- Valider la compilation et les tests sur **Linux et macOS**, puis publier
-  les binaires correspondants dans la release ou en v1.0.1.
+Les phases 0 à 6 du plan sont terminées (voir [PLAN.md](PLAN.md)) et la
+**v1.0.0** est publiée. Cette feuille de route couvre la suite.
 
 ## Court terme
 
-- Publier les exécutables Windows/Linux/macOS en [GitHub Releases](https://github.com/mickael-cala/MCP-file-PB/releases)
-  et créer le tag `v1.0.0`.
-- Exécuter la suite sur Linux et macOS (aujourd'hui validée sous Windows).
-- Ajouter un `CHANGELOG` de version au moment du tag.
+- **Valider macOS** (le code et `build.sh` sont prêts ; prérequis : `curl`),
+  puis publier les binaires **Linux** et **macOS** dans une release `v1.0.1`
+  avec `SHA256SUMS`.
+- Ajouter une **CI GitHub Actions** (matrice Windows/Linux) si un runner avec
+  PureBasic sous licence devient disponible.
 
 ## Moyen terme
 

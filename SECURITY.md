@@ -18,9 +18,9 @@ Le dépôt contient 8 serveurs MCP, chacun avec ses garde-fous :
 | `fileMCP` | Système de fichiers | Confinement à `MCP_ROOT`, normalisation des chemins (traversées `..` refusées), `change_root` protégé par `MCP_ROOT_SECRET` |
 | `memoryMCP` | Base SQLite | Échappement SQL (apostrophes doublées), FK en cascade, base locale (`MCP_MEMORY_DB`) |
 | `dbMCP` | Bases SQL | **Lecture seule par défaut** (`IsReadOnlyQuery`), écritures uniquement avec `MCP_DB_ALLOW_WRITE=1`, refus journalisés |
-| `context7MCP` | API web | HTTP/HTTPS uniquement, clé API jamais loggée |
+| `context7MCP` | API web | HTTP/HTTPS uniquement, clé API jamais loggée (WinHTTP/curl) |
 | `gitMCP` | Sous-processus git | `GitSafeParam` rejette les métacaractères shell sur tous les paramètres, aucune commande exécutée sans validation |
-| `githubMCP` | API GitHub | Écritures exigeant `confirm=true`, token jamais renvoyé ni loggé, pagination bornée, validation des segments d'URL |
+| `githubMCP` | API GitHub | Écritures exigeant `confirm=true`, token jamais renvoyé ni loggé, pagination bornée, validation des segments d'URL (WinHTTP/curl) |
 | `MCP-Fetch-PB` | API web | HTTP/HTTPS uniquement, hôtes privés/loopback refusés (anti-SSRF) |
 | `MCP-SequentialThinking-PB` | État local | Aucune I/O externe |
 

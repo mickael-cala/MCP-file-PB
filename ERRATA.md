@@ -22,9 +22,8 @@
 - `change_root` avec un secret incorrect renvoie `isError: true` mais le
   texte reste en français non structuré ; les clients doivent tester le
   drapeau, pas le texte.
-- Tests exécutés sous Windows uniquement pour l'instant ; les chemins des
-  scripts de build Linux/macOS sont validés statiquement (`bash -n`) mais
-  non testés en CI.
+- Tests exécutés sous **Windows** et **Linux (WSL2 Ubuntu 26.04)** ; macOS
+  n'est pas encore validé. Aucune CI automatisée (PureBasic sous licence).
 
 ## Résultats des tests
 

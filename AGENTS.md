@@ -210,6 +210,8 @@ src/context7MCP.pb + context7_core.pbi  documentation Context7
 src/gitMCP.pb + git_core.pbi            exploration git locale
 src/githubMCP.pb + github_core.pbi      API REST GitHub
 examples/minimal_server.pb        serveur MCP minimal de demo
+examples/mcp.json                 configuration client complete (8 serveurs)
+.gitattributes                    fins de ligne (LF scripts/sources, CRLF .bat)
 build.bat/build.sh                compilation des 8 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)

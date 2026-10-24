@@ -31,7 +31,11 @@ avec les modèles fournis (bug, fonctionnalité). Incluez si possible :
 - **PureBasic** avec `EnableExplicit` obligatoire.
 - Commentaires et messages d'erreur en **français**, comme le code existant.
 - Sélection multi-OS par `CompilerIf #PB_Compiler_OS = #PB_OS_Windows`, jamais
-  par hacks runtime.
+  par hacks runtime. Ne pas mélanger les options de compilation : `build.bat`
+  = options Windows (`/EXE`, `/CONSOLE`), `build.sh` = options POSIX
+  (`-o`, `-cl`, `-t`).
+- Fins de ligne : `.gitattributes` impose LF aux scripts et sources
+  (un shebang en CRLF casse l'exécution sous Linux/WSL).
 - **Ne jamais utiliser `Input()`** pour lire stdin : utiliser la couche
   `ReadStdinLine()` / `SendRawLine()` de `mcp_common/stdio.pbi`.
 - **Architecture** : un serveur inclut `mcp_common/` (ordre : `stdio`,
