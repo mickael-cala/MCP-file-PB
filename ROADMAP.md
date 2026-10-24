@@ -1,13 +1,12 @@
 # Feuille de route
 
-Les phases 0 à 5 du plan de développement sont terminées (voir [PLAN.md](PLAN.md)).
+Les phases 0 à 6 du plan de développement sont terminées (voir [PLAN.md](PLAN.md)).
 Cette feuille de route couvre la suite.
 
 ## Prochaines étapes
 
-- **Phase 6 — consolidation** : tests de robustesse (10 000 requêtes, JSON
-  1 Mo, JSON malformé, EOF brutal, DB verrouillée, réseau coupé), tests de
-  performance (T6.9–T6.14), rapport HTML par serveur, `examples/mcp.json`.
+- Publier une version **v1.0.0** (tag + GitHub Releases) après validation
+  Linux/macOS.
 
 ## Court terme
 

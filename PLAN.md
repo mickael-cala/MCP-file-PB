@@ -10,7 +10,7 @@
 | **3** | Context7 | ✅ Terminée | `context7MCP` (2 outils), WinHTTP + en-têtes, 19 tests unitaires, 7 tests d'intégration (live conditionnel) |
 | **4** | Git | ✅ Terminée | `gitMCP` (7 outils, validation anti-injection), 24 tests unitaires, 12 tests d'intégration |
 | **5** | GitHub | ✅ Terminée | `githubMCP` (10 outils, `confirm=true`, mock local), 40 tests unitaires, 25 tests d'intégration |
-| **6** | Consolidation et tests transverses | ⏳ À faire | robustesse T6.1–T6.8, performances T6.9–T6.14, rapport final |
+| **6** | Consolidation et tests transverses | ✅ Terminée | `tests/test_robustness.py` (17 vérifications T6.1–T6.14), rapport HTML par serveur, `examples/mcp.json` |
 
 ## Définition de « terminé » (état actuel)
 
@@ -22,8 +22,8 @@
 | Erreurs MCP en `isError: true` avec message clair | ✅ heuristique `DetectIsError` + refus explicites |
 | Aucun secret loggé ni renvoyé | ✅ tokens/clés jamais inclus dans les réponses ; logs stderr |
 | Documentation README complète | ✅ (outils, env, build, tests, config client) |
-| Robustesse (10 000 requêtes, JSON 1 Mo, EOF brutal) | ⏳ Phase 6 |
-| Performances cibles (T6.9–T6.14) | ⏳ Phase 6 |
+| Robustesse (T6.1–T6.8) | ✅ 17/17 vérifications (charge 10k via `MCP_STRESS_REQUESTS`) |
+| Performances cibles (T6.9–T6.14) | ✅ atteintes (T6.14 conditionnel à une clé Context7) |
 
 ## Détail des phases
 
@@ -72,9 +72,16 @@
 - `confirm=true` obligatoire pour les écritures ; mock local `tests/mock_github.py`.
 - Tests : T5.1–T5.15 via mock + `T5.4` sans token ; 40 tests unitaires.
 
-### Phase 6 — Consolidation (à faire)
-- Robustesse : 10 000 `tools/list`, JSON 1 Mo, JSON malformé, fermeture stdin,
-  `kill` pendant une requête, DB verrouillée, chemin invalide, réseau coupé.
-- Performances : entités (100 < 500 ms), recherche 10 000 entités (< 200 ms),
-  SELECT simple (< 50 ms), `git log` 1 000 commits (< 200 ms).
-- Rapport HTML consolidé par serveur, `examples/mcp.json` complet.
+### Phase 6 — Consolidation (terminée)
+- `tests/test_robustness.py` : T6.1 charge stdio (500 par défaut, 10 000 via
+  `MCP_STRESS_REQUESTS`), T6.2 JSON 1 Mo, T6.3 JSON malformé, T6.4 stdin fermé,
+  T6.5 `kill` pendant une requête (base rouverte), T6.6 deux instances sur la
+  même base (lecture cohérente documentée), T6.7 chemin DB invalide,
+  T6.8 coupure réseau Context7.
+- Performances : T6.9 100 entités (< 500 ms, transaction SQLite ajoutée),
+  T6.10 recherche 10 000 entités (< 200 ms), T6.11 SELECT (< 50 ms),
+  T6.12 `git log` 1 000 commits (< 200 ms), T6.13 GitHub mock (< 2 s),
+  T6.14 Context7 (< 3 s, conditionnel).
+- `tests/report.json` + `tests/make_report.py` → `tests/report.html` par
+  serveur ; `examples/mcp.json` (8 serveurs) ; `MCP_CONTEXT7_API_BASE`
+  ajouté pour les tests de coupure réseau.

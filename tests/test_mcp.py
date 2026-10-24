@@ -18,6 +18,7 @@ Usage :
     python tests/test_mcp.py [nom-du-serveur ...]   # par defaut : les 3
 """
 
+import json
 import os
 import re
 import sys
@@ -30,15 +31,20 @@ ROOT_SECRET = "test-secret-123"
 
 passed = 0
 failed = 0
+current_suite = None
+suite_stats = {}
 
 
 def check(name, condition, detail=""):
     global passed, failed
+    stats = suite_stats.setdefault(current_suite or "global", {"passed": 0, "failed": 0})
     if condition:
         passed += 1
+        stats["passed"] += 1
         print(f"  [OK]   {name}")
     else:
         failed += 1
+        stats["failed"] += 1
         print(f"  [FAIL] {name}  {detail}")
 
 
@@ -589,18 +595,32 @@ def main():
         sys.exit(2)
 
     skipped = []
+    global current_suite
     for server in requested:
         binary = find_binary(server)
         if binary is None:
             skipped.append(server)
+            suite_stats[server] = {"skipped": True}
             print(f"[SKIP] {server} : binaire introuvable "
                   f"(compilez avec build.bat / build.sh ou definissez "
                   f"{server.upper().replace('-', '_')}_BIN)")
             continue
-        print(f"\nBinaire teste : {binary}")
+        print()
+        print(f"Binaire teste : {binary}")
+        current_suite = server
         SUITES[server]()
+        current_suite = None
 
-    print(f"\n{passed} reussis, {failed} echoues, {len(skipped)} ignores")
+    report = {
+        "suites": suite_stats,
+        "totals": {"passed": passed, "failed": failed, "skipped": len(skipped)},
+    }
+    report_path = Path(__file__).resolve().parent / "report.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print()
+    print(f"{passed} reussis, {failed} echoues, {len(skipped)} ignores")
+    print(f"Rapport JSON : {report_path}")
     sys.exit(0 if failed == 0 and not skipped else 1)
 
 

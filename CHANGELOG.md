@@ -4,8 +4,21 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 6 — consolidation)
+- **`tests/test_robustness.py`** : T6.1 charge stdio (500 requêtes par
+  défaut, 10 000 via `MCP_STRESS_REQUESTS`, stabilité de latence), T6.2 JSON
+  1 Mo, T6.3 JSON malformé, T6.4 EOF brutal, T6.5 `kill` pendant une requête,
+  T6.6 deux instances sur la même base, T6.7 chemin DB invalide, T6.8 coupure
+  réseau Context7 ; performances T6.9–T6.14 (17 vérifications).
+- **`tests/make_report.py`** + `tests/report.json` : rapport HTML par serveur.
+- **`examples/mcp.json`** : configuration client complète des 8 serveurs.
+- `MCP_CONTEXT7_API_BASE` : base API configurable (tests de coupure réseau).
+- **Optimisation** : `create_entities` exécute une transaction SQLite unique
+  (100 entités : ~900 ms → < 500 ms ; rollback sur erreur).
+- `run_all` : **10/10 étapes** (ajout robustesse/perf, rapport par serveur).
+
 ### Documentation
-- **`AGENTS.md`** restructuré : section **« Reprise du développement »**
+- `AGENTS.md` restructuré : section **« Reprise du développement »**
   (bootstrap), **règle absolue de synchronisation des `.md` avant chaque
   commit** (checklist fichier par fichier), workflow de commit/push,
   architecture `mcp_common/` complète (dont `http.pbi`), et catalogue des

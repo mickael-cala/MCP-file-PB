@@ -70,6 +70,11 @@ build\test_github.exe 2>&1 || (call :ko "tests unitaires github" & goto :report)
 call :ok "tests unitaires github"
 
 echo.
+echo === Tests de robustesse et performance (Phase 6) ===
+python tests\test_robustness.py || (call :ko "robustesse/perf" & goto :report)
+call :ok "robustesse/perf"
+
+echo.
 echo === Tests d'integration Python ===
 python tests\test_mcp.py || (call :ko "tests d'integration" & goto :report)
 call :ok "tests d'integration"
@@ -90,15 +95,7 @@ echo.
 echo === Rapport ===
 echo Etapes reussies : %STEP_OK%, echouees : %STEP_KO%
 
-rem Rapport HTML minimal
-(
-echo ^<!DOCTYPE html^>
-echo ^<html^>^<head^>^<meta charset="utf-8"^>^<title^>Rapport de tests MCP-file-PB^</title^>^</head^>^<body^>
-echo ^<h1^>Rapport de tests^</h1^>
-echo ^<p^>Etapes reussies : %STEP_OK% - echouees : %STEP_KO%^</p^>
-echo ^</body^>^</html^>
-) > tests\report.html
-echo Rapport genere : tests\report.html
+python tests\make_report.py %STEP_OK% %STEP_KO%
 
 if %STEP_KO% gtr 0 exit /b 1
 exit /b 0

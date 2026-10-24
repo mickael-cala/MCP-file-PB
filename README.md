@@ -167,7 +167,8 @@ Les exécutables compilés ne sont pas versionnés : publiez-les via [GitHub Rel
 ## Tests
 
 Trois niveaux de tests, lances d'un coup par `run_all.bat` / `./run_all.sh`
-(compilation + tests unitaires + tests d'integration + `tests/report.html`) :
+(compilation + tests unitaires + robustesse/performance + intégration +
+`tests/report.html` avec le détail par serveur) :
 
 ```bash
 run_all.bat        # ou ./run_all.sh : tout verifier
@@ -186,7 +187,19 @@ python tests/test_mcp.py                          # les 8 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
+100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne).
+
+- **Robustesse et performances (Phase 6)** : `tests/test_robustness.py` —
+  17 vérifications (charge stdio, JSON 1 Mo, JSON malformé, EOF brutal,
+  kill pendant une requête, DB partagée/invalide, coupure réseau, cibles de
+  performance T6.9–T6.14) :
+
+```bash
+python tests/test_robustness.py
+MCP_STRESS_REQUESTS=10000 python tests/test_robustness.py   # charge complète
+```
+
+Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -263,6 +276,7 @@ src/
 ├── github_core.pbi               # Coeur metier GitHub (API REST)
 
 examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
+examples/mcp.json           # Configuration client MCP complete (8 serveurs)
 build.bat / build.sh        # Compilation des 8 serveurs (sortie dans build/)
 clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport

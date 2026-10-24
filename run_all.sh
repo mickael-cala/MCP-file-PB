@@ -92,6 +92,14 @@ else
 fi
 
 echo
+echo "=== Tests de robustesse et performance (Phase 6) ==="
+if python3 tests/test_robustness.py || python tests/test_robustness.py; then
+    ok
+else
+    ko "robustesse/perf"
+fi
+
+echo
 echo "=== Tests d'integration Python ==="
 if python3 tests/test_mcp.py || python tests/test_mcp.py; then
     ok
@@ -103,7 +111,7 @@ echo
 echo "=== Rapport ==="
 echo "Etapes reussies : $STEP_OK, echouees : $STEP_KO"
 
-cat > tests/report.html <<EOF
+python3 tests/make_report.py "$STEP_OK" "$STEP_KO" || python tests/make_report.py "$STEP_OK" "$STEP_KO"
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Rapport de tests MCP-file-PB</title></head><body>
 <h1>Rapport de tests</h1>

@@ -12,6 +12,7 @@
 ; ============================================================================
 
 Global G_C7ApiKey.s = ""
+Global G_C7ApiBase.s = "https://context7.com/api/v1"
 
 ; ---------------------------------------------------------------------------
 ; Mapping des erreurs HTTP en message MCP
@@ -51,7 +52,7 @@ Procedure.s ToolResolveLibraryId(Query.s, LibraryType.s)
   EndIf
   If LibraryType = "" : LibraryType = "oss" : EndIf
 
-  Protected Url.s = "https://context7.com/api/v1/search?query=" + UrlEncodeComponent(Query) + "&libraryType=" + UrlEncodeComponent(LibraryType)
+  Protected Url.s = G_C7ApiBase + "/search?query=" + UrlEncodeComponent(Query) + "&libraryType=" + UrlEncodeComponent(LibraryType)
   Protected Status.i
   Protected Body.s = HttpGetHeaders(Url, "", 15, @Status)
   If Status <> 200
@@ -111,7 +112,7 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
 
   Protected Auth.s = "Authorization: Bearer " + G_C7ApiKey
 
-  Protected Url.s = "https://context7.com/api/v1/docs?libraryId=" + UrlEncodeComponent(LibraryId) +
+  Protected Url.s = G_C7ApiBase + "/docs?libraryId=" + UrlEncodeComponent(LibraryId) +
                     "&query=" + UrlEncodeComponent(Query) +
                     "&tokens=" + Str(Tokens)
   If Topic <> ""

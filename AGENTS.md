@@ -19,8 +19,8 @@ travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
    build.bat                  # ou ./build.sh : compile les 8 serveurs
    run_all.bat                # ou ./run_all.sh : unitaires + intégration + rapport
    ```
-   Attendu : **9/9 étapes**, **177 tests unitaires** (24+33+37+19+24+40) et
-   **100/100 tests d'intégration**. Si ce n'est pas le cas, corriger avant
+   Attendu : **10/10 étapes**, **177 tests unitaires** (24+33+37+19+24+40),
+   **17/17 robustesse/performance** et **100/100 tests d'intégration**. Si ce n'est pas le cas, corriger avant
    toute nouvelle fonctionnalité.
 4. **Choisir la suite** : Phase 6 (robustesse/performances) est la prochaine
    étape du plan ; sinon, voir ROADMAP.md. Ne jamais démarrer une phase sans
@@ -92,7 +92,7 @@ Le cœur métier d'un serveur va dans `src/<serveur>_core.pbi` (testable), le
 ```bash
 build.bat              # Windows : compile les 8 serveurs -> build\*.exe
 ./build.sh             # Linux/macOS : compile les 8 serveurs -> build/
-run_all.bat            # compilation + 6 suites unitaires + intégration + report.html
+run_all.bat            # compilation + 6 suites unitaires + robustesse/perf + intégration + report.html
 ./run_all.sh           # idem sous Linux/macOS
 python tests/test_mcp.py [serveur]   # intégration seule (100 tests)
 ./clean.sh             # nettoie build/
@@ -203,6 +203,8 @@ tests/test_database.pb            tests unitaires Database (37 tests)
 tests/test_context7.pb            tests unitaires Context7 (19 tests)
 tests/test_git.pb                 tests unitaires Git (24 tests)
 tests/test_github.pb              tests unitaires GitHub (40 tests)
+tests/test_robustness.py          robustesse T6.1-T6.8 + perf T6.9-T6.14
+tests/make_report.py              rapport HTML depuis report.json
 ```
 
 Voir aussi : [PLAN.md](PLAN.md), [README.md](README.md),

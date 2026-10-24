@@ -28,8 +28,21 @@
 
 ## Résultats des tests
 
-Dernière exécution de `run_all.bat` : **9/9 étapes** — tests unitaires
+Dernière exécution de `run_all.bat` : **10/10 étapes** — tests unitaires
 24 + 33 + 37 + 19 + 24 + 40 réussis (mcp_common, Memory, Database, Context7,
-Git, GitHub), tests d'intégration **100/100** (8 serveurs ; PostgreSQL et
-Context7 live sont ignorés sans configuration/réseau, GitHub utilise un mock
-local).
+Git, GitHub), robustesse/performance **17/17**, tests d'intégration
+**100/100** (8 serveurs ; PostgreSQL et Context7 live sont ignorés sans
+configuration/réseau, GitHub utilise un mock local).
+
+## Comportements documentés (Phase 6)
+
+- **Deux instances Memory sur la même base** : SQLite autorise plusieurs
+  connexions ; les écritures sont sérialisées (verrou d'écriture), les
+  lectures voient l'état validé. Aucun mode WAL n'est activé : des écritures
+  concurrentes longues peuvent produire une erreur `database is locked`
+  remontée proprement par l'outil.
+- **Ligne stdin > 64 Ko** : la ligne est tronquée par la couche stdio
+  (buffer 64 Ko) et rejetée en `-32700` ; le serveur poursuit normalement.
+  Ne pas envoyer plus de 64 Ko par message JSON.
+- **Context7 sous Linux/macOS** : le HTTP intégré n'accepte pas d'en-têtes →
+  `query_docs` retourne une erreur explicite (fallback Windows/WinHTTP).

@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "file-pb": {
+      "command": "/chemin/vers/build/fileMCP",
+      "env": {
+        "MCP_ROOT": "/chemin/vers/zone/autorisee",
+        "MCP_ROOT_SECRET": "mot-de-passe-fort"
+      }
+    },
+    "fetch-pb": {
+      "command": "/chemin/vers/build/MCP-Fetch-PB"
+    },
+    "sequential-thinking-pb": {
+      "command": "/chemin/vers/build/MCP-SequentialThinking-PB"
+    },
+    "memory-pb": {
+      "command": "/chemin/vers/build/memoryMCP",
+      "env": {
+        "MCP_MEMORY_DB": "/chemin/vers/memory.db"
+      }
+    },
+    "db-pb": {
+      "command": "/chemin/vers/build/dbMCP",
+      "env": {
+        "MCP_DB_PATH": "/chemin/vers/database.db",
+        "MCP_DB_POSTGRES_DSN": "host=localhost port=5432 dbname=test user=reader",
+        "MCP_DB_ALLOW_WRITE": "0"
+      }
+    },
+    "context7-pb": {
+      "command": "/chemin/vers/build/context7MCP",
+      "env": {
+        "MCP_CONTEXT7_API_KEY": "ctx7sk_..."
+      }
+    },
+    "git-pb": {
+      "command": "/chemin/vers/build/gitMCP",
+      "env": {
+        "MCP_GIT_EXE": "git"
+      }
+    },
+    "github-pb": {
+      "command": "/chemin/vers/build/githubMCP",
+      "env": {
+        "MCP_GITHUB_TOKEN": "ghp_..."
+      }
+    }
+  }
+}

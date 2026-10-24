@@ -29,6 +29,12 @@ If Not CheckStdio()
   End 1
 EndIf
 
+Global G_C7BaseEnv.s = GetEnvironmentVariable("MCP_CONTEXT7_API_BASE")
+If G_C7BaseEnv <> ""
+  G_C7ApiBase = G_C7BaseEnv
+EndIf
+LogDebug("API Context7 : " + G_C7ApiBase)
+
 G_C7ApiKey = GetEnvironmentVariable("MCP_CONTEXT7_API_KEY")
 If G_C7ApiKey = ""
   LogDebug("MCP_CONTEXT7_API_KEY absente : resolve_library_id disponible, query_docs retournera une erreur 401 explicite.")

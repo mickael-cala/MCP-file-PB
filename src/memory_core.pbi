@@ -168,13 +168,20 @@ Procedure.s ToolCreateEntities(ArgsObj.i)
   Protected n.i = JSONArraySize(Arr), i.i
   Protected Created.i = 0, ObsCreated.i = 0
 
+  ; Une seule transaction : 100 entites passent de ~900 ms a quelques ms
+  If DatabaseUpdate(G_MemDB, "BEGIN TRANSACTION") = 0 And DatabaseError() <> ""
+    ProcedureReturn "Erreur SQLite : " + DatabaseError()
+  EndIf
+
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
+      DatabaseUpdate(G_MemDB, "ROLLBACK")
       ProcedureReturn "Erreur : chaque entite doit etre un objet {name, entityType, observations}."
     EndIf
     Protected Name.s = GetArgString(Item, "name")
     If Trim(Name) = ""
+      DatabaseUpdate(G_MemDB, "ROLLBACK")
       ProcedureReturn "Erreur : 'name' ne peut pas etre vide. " + Str(Created) + " entite(s) creee(s) avant l'echec."
     EndIf
     Protected EType.s = GetArgString(Item, "entityType")
@@ -183,6 +190,7 @@ Procedure.s ToolCreateEntities(ArgsObj.i)
     ; INSERT OR IGNORE : doublon -> pas d'erreur, pas de duplication
     DatabaseUpdate(G_MemDB, "INSERT OR IGNORE INTO entities (name, entityType) VALUES (" + SqlQuote(Name) + ", " + SqlQuote(EType) + ")")
     If DatabaseError() <> ""
+      DatabaseUpdate(G_MemDB, "ROLLBACK")
       ProcedureReturn "Erreur SQLite : " + DatabaseError()
     EndIf
     If DatabaseUpdate(G_MemDB, "UPDATE entities SET entityType=" + SqlQuote(EType) + " WHERE name=" + SqlQuote(Name)) >= 0
@@ -205,6 +213,7 @@ Procedure.s ToolCreateEntities(ArgsObj.i)
     EndIf
   Next
 
+  DatabaseUpdate(G_MemDB, "COMMIT")
   ProcedureReturn "Entites enregistrees : " + Str(Created) + " (" + Str(ObsCreated) + " observations)."
 EndProcedure
 
