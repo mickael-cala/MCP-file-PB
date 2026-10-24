@@ -28,5 +28,7 @@
 
 ## Résultats des tests
 
-Dernière exécution de `python tests/test_mcp.py` : **17/17 réussis**
-(Windows, PureBasic via `build.bat`).
+Dernière exécution de `run_all.bat` : **6/6 étapes** — tests unitaires
+24 + 33 + 37 réussis (mcp_common, Memory, Database), tests d'intégration
+**56/56** (5 serveurs ; les tests PostgreSQL sont ignorés sans
+`MCP_DB_POSTGRES_TEST_DSN`).
