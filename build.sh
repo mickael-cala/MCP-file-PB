@@ -24,7 +24,7 @@ mkdir -p build
 
 for SRC in fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB memoryMCP dbMCP context7MCP gitMCP githubMCP; do
     echo "Compilation de src/$SRC.pb ..."
-    "$PBC" "src/$SRC.pb" /EXE "build/$SRC" /CONSOLE /UNICODE /THREAD
+    "$PBC" "src/$SRC.pb" -o "build/$SRC" -cl -t
 done
 
 echo "[OK] Executables generes dans build/"

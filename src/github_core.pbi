@@ -84,7 +84,7 @@ Procedure.s GhErrorText(Status.i, Body.s)
   Protected Msg.s
   Select Status
     Case -2
-      Msg = "Erreur GitHub : les en-tetes HTTP ne sont pas supportes sur cet OS (Windows requis pour l'authentification)."
+      Msg = "Erreur GitHub : curl est introuvable sur cet OS (necessaire pour l'authentification HTTP)."
     Case -1
       Msg = "Erreur GitHub : echec reseau (DNS, connexion ou timeout)."
     Case 401

@@ -87,7 +87,7 @@ Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/
 | `resolve_library_id` | Recherche une bibliothèque, retourne les identifiants `/owner/repo` (fonctionne sans clé) | `query`, `libraryType` (défaut `oss`) |
 | `query_docs` | Retourne la documentation d'une bibliothèque (**clé API requise** : `MCP_CONTEXT7_API_KEY`, préfixe `ctx7sk`) | `libraryId`, `query`, `tokens` (défaut 5000), `topic` (optionnel), `max_length` (troncature locale, défaut 10000) |
 
-HTTP : couche WinHTTP native sous Windows (en-têtes `Authorization` supportées) ; HTTP intégré PureBasic sous Linux/macOS (clé non supportée → message explicite). Erreurs mappées proprement : 401 clé, 429 quota, 5xx indisponible, échec réseau. Les tests live sont ignorés hors ligne.
+HTTP : couche **WinHTTP** native sous Windows ; **curl** sous Linux/macOS (en-têtes `Authorization` supportées, `curl` requis). Erreurs mappées proprement : 401 clé, 429 quota, 5xx indisponible, échec réseau. Les tests live sont ignorés hors ligne.
 
 ### gitMCP — dépôts git locaux
 
@@ -141,7 +141,15 @@ Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils t
 
 ## Compilation
 
-Requiert [PureBasic](https://www.purebasic.com) et un format d'exécutable **Console**.
+Requiert [PureBasic](https://www.purebasic.com) (testé en 6.41) et un format d'exécutable **Console**.
+
+**Prérequis système** :
+
+- **Windows** : rien de plus (WinHTTP est natif).
+- **Linux** : `libssl-dev`, `libsqlite3-dev`, `curl`
+  (`sudo apt install libssl-dev libsqlite3-dev curl`).
+- **macOS** : `curl` (fourni par le système).
+
 
 ### Avec les scripts de build (recommandé)
 
@@ -151,6 +159,8 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ```
 
 Les scripts compilent les 8 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+
+`build.bat` utilise les options Windows (`/EXE`, `/CONSOLE`) ; `build.sh` utilise les options Linux/macOS (`-o`, `-cl`, `-t`). **Validé sous WSL2 Ubuntu 26.04** (PureBasic 6.41) : compilation des 8 serveurs + suite complète (10/10).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 

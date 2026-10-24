@@ -3,8 +3,8 @@
 ;  Partagee par les serveurs qui appellent des API web authentifiees.
 ; ============================================================================
 ;  Windows  : WinHTTP (winhttp.dll) -> en-tetes personnalises, HTTPS/HTTP.
-;  Linux/macOS : HTTP integre PureBasic (pas d'en-tetes) -> Status = -2 si
-;                des en-tetes sont demandes ; POST non supporte.
+;  Linux/macOS : curl (config file) -> en-tetes supportees ; Status = -1
+;                si curl est absent.
 ;
 ;  A inclure apres stdio.pbi (SendStderrLine) :
 ;    IncludeFile "../mcp_common/stdio.pbi"
@@ -188,35 +188,94 @@ EndProcedure
 
 CompilerElse
 
-; Fallback Linux/macOS : HTTP integre PureBasic (sans en-tetes).
-Procedure.s HttpGetHeaders(Url.s, Headers.s, TimeoutSec.i, *Status.Integer)
+; ---------------------------------------------------------------------------
+; Fallback Linux/macOS : curl (config file -> pas de probleme de quoting)
+; ---------------------------------------------------------------------------
+
+Procedure.s CurlEsc(S.s)
+  S = ReplaceString(S, Chr(92), Chr(92) + Chr(92))
+  S = ReplaceString(S, Chr(34), Chr(92) + Chr(34))
+  ProcedureReturn S
+EndProcedure
+
+Procedure.s HttpCurl(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *Status.Integer)
+  *Status\i = -1
+  Protected Base.s = GetTemporaryDirectory() + "mcp_http_" + Str(Date()) + "_" + Str(Random(999999))
+  Protected CfgFile.s = Base + ".cfg"
+  Protected OutFile.s = Base + ".out"
+  Protected BodyFile.s = Base + ".body"
+
+  Protected F.i = CreateFile(#PB_Any, CfgFile)
+  If F = 0 : ProcedureReturn "" : EndIf
+  WriteString(F, "silent" + #LF$, #PB_UTF8)
+  WriteString(F, "show-error" + #LF$, #PB_UTF8)
+  WriteString(F, "max-time = " + Str(TimeoutSec) + #LF$, #PB_UTF8)
+  WriteString(F, "request = " + #DQUOTE$ + Method + #DQUOTE$ + #LF$, #PB_UTF8)
+  WriteString(F, "url = " + #DQUOTE$ + CurlEsc(Url) + #DQUOTE$ + #LF$, #PB_UTF8)
+  WriteString(F, "output = " + #DQUOTE$ + CurlEsc(OutFile) + #DQUOTE$ + #LF$, #PB_UTF8)
+  WriteString(F, "write-out = " + #DQUOTE$ + "%{http_code}" + #DQUOTE$ + #LF$, #PB_UTF8)
+
+  ; En-tetes (separees par CRLF dans le parametre Headers)
   If Headers <> ""
-    *Status\i = -2   ; des en-tetes sont requis mais non supportes
-    ProcedureReturn ""
+    Protected HCount.i = CountString(Headers, #CRLF$) + 1, Hi.i, HLine.s
+    For Hi = 1 To HCount
+      HLine = Trim(StringField(Headers, Hi, #CRLF$))
+      If HLine <> ""
+        WriteString(F, "header = " + #DQUOTE$ + CurlEsc(HLine) + #DQUOTE$ + #LF$, #PB_UTF8)
+      EndIf
+    Next
   EndIf
-  HTTPTimeout(TimeoutSec * 1000)
-  Protected Req.i = HTTPRequestMemory(#PB_HTTP_Get, Url)
-  If Not Req
-    *Status\i = -1
-    ProcedureReturn ""
-  EndIf
-  *Status\i = Val(HTTPInfo(Req, #PB_HTTP_StatusCode))
-  Protected Result.s = ""
-  Protected *Buf = HTTPMemory(Req)
-  If *Buf
-    Protected Size.i = MemorySize(*Buf)
-    If Size > 0
-      Result = PeekS(*Buf, Size, #PB_UTF8 | #PB_ByteLength)
+
+  If Method = "POST" And Body <> ""
+    Protected BF.i = CreateFile(#PB_Any, BodyFile)
+    If BF
+      WriteString(BF, Body, #PB_UTF8)
+      CloseFile(BF)
     EndIf
+    WriteString(F, "data-binary = " + #DQUOTE$ + "@" + CurlEsc(BodyFile) + #DQUOTE$ + #LF$, #PB_UTF8)
   EndIf
-  FinishHTTP(Req)
+  CloseFile(F)
+
+  Protected Prog.i = RunProgram("curl", "-K " + CfgFile, "", #PB_Program_Open | #PB_Program_Read | #PB_Program_Hide)
+  If Prog = 0
+    DeleteFile(CfgFile)
+    ProcedureReturn ""
+  EndIf
+  Protected Out.s = ""
+  Repeat
+    If AvailableProgramOutput(Prog)
+      Out + ReadProgramString(Prog, #PB_UTF8)
+    Else
+      Delay(5)
+    EndIf
+  Until ProgramRunning(Prog) = 0 And AvailableProgramOutput(Prog) = 0
+  WaitProgram(Prog)
+  Protected ExitCode.i = ProgramExitCode(Prog)
+  CloseProgram(Prog)
+
+  Protected Result.s = ""
+  If ExitCode = 0
+    *Status\i = Val(Trim(Out))
+    Protected R.i = ReadFile(#PB_Any, OutFile)
+    If R
+      Result = ReadString(R, #PB_UTF8, Lof(R))
+      CloseFile(R)
+    EndIf
+    If *Status\i = 0 : *Status\i = 200 : EndIf   ; write-out vide : succes
+  EndIf
+
+  DeleteFile(CfgFile)
+  DeleteFile(OutFile)
+  If Method = "POST" And Body <> "" : DeleteFile(BodyFile) : EndIf
   ProcedureReturn Result
 EndProcedure
 
+Procedure.s HttpGetHeaders(Url.s, Headers.s, TimeoutSec.i, *Status.Integer)
+  ProcedureReturn HttpCurl(Url, "GET", Headers, "", TimeoutSec, *Status)
+EndProcedure
+
 Procedure.s HttpPostHeaders(Url.s, Headers.s, Body.s, TimeoutSec.i, *Status.Integer)
-  ; POST avec corps non supporte par le HTTP integre de facon portable
-  *Status\i = -2
-  ProcedureReturn ""
+  ProcedureReturn HttpCurl(Url, "POST", Headers, Body, TimeoutSec, *Status)
 EndProcedure
 
 CompilerEndIf

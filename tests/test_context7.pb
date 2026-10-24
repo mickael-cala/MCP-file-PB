@@ -28,7 +28,7 @@ EndProcedure
 Procedure Test_HttpErrorText()
   SendStderrLine("--- C7HttpErrorText ---")
   UTAssert(1, Bool(FindString(C7HttpErrorText(-1, "P"), "echec reseau") > 0), "-1 -> echec reseau")
-  UTAssert(1, Bool(FindString(C7HttpErrorText(-2, "P"), "Authorization") > 0), "-2 -> en-tetes non supportees")
+  UTAssert(1, Bool(FindString(C7HttpErrorText(-2, "P"), "curl") > 0), "-2 -> couche HTTP indisponible (curl)")
   UTAssert(1, Bool(FindString(C7HttpErrorText(401, "P"), "401") > 0), "401 -> cle invalide")
   UTAssert(1, Bool(FindString(C7HttpErrorText(429, "P"), "quota") > 0), "429 -> quota depasse")
   UTAssert(1, Bool(FindString(C7HttpErrorText(500, "P"), "indisponible") > 0), "5xx -> indisponible")

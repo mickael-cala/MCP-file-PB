@@ -44,5 +44,8 @@ configuration/réseau, GitHub utilise un mock local).
 - **Ligne stdin > 64 Ko** : la ligne est tronquée par la couche stdio
   (buffer 64 Ko) et rejetée en `-32700` ; le serveur poursuit normalement.
   Ne pas envoyer plus de 64 Ko par message JSON.
-- **Context7 sous Linux/macOS** : le HTTP intégré n'accepte pas d'en-têtes →
-  `query_docs` retourne une erreur explicite (fallback Windows/WinHTTP).
+- **En-têtes HTTP hors Windows** : assurés par **curl** (config file). Si curl
+  est absent, `context7MCP`/`githubMCP` retournent une erreur explicite.
+- **Compilation Linux** : nécessite `libssl-dev` et `libsqlite3-dev`
+  (bibliothèques liées par PureBasic). Validé sous WSL2 Ubuntu 26.04 ;
+  macOS non testé à ce jour.

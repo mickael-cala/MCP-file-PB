@@ -2,6 +2,25 @@
 
 Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Corrigé (validation Linux/WSL2)
+- **`build.sh` / `run_all.sh`** utilisaient les options Windows (`/EXE`,
+  `/CONSOLE`, `/UNICODE`) : remplacées par les options Linux/macOS
+  (`-o`, `-cl`, `-t`).
+- **HTTP avec en-têtes sous Linux/macOS** : implémentation via **curl**
+  (fichier de configuration, aucun quoting shell) → `githubMCP` et
+  `context7MCP` fonctionnent hors Windows ; `curl` requis.
+- **`gitMCP` sous Linux** : `RunProgram` n'interprète pas les guillemets →
+  exécution via un script `sh` temporaire ; validation explicite de
+  `repoPath` (un répertoire inexistant ne fait plus exécuter git dans le
+  répertoire courant).
+- **`.gitattributes`** : LF forcé pour `.sh/.py/.pb/.pbi/.md/.json`
+  (un shebang CRLF casse l'exécution sous WSL), CRLF pour `.bat`.
+- Tests de contexte : message `-2` mis à jour (curl).
+- **Suite complète validée sous WSL2 Ubuntu 26.04** : 8 serveurs compilés,
+  `run_all` 10/10, 177 unitaires, 17 robustesse/perf, 100 intégration.
+
 ## [1.0.0] - 2026-10-24
 
 ### Ajouté (Phase 6 — consolidation)

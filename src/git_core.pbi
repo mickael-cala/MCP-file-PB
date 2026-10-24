@@ -81,14 +81,31 @@ Procedure.i GitRun(RepoPath.s, GitArgs.s, *R.GitResult)
   *R\Output = ""
   *R\ErrText = ""
 
+  ; Sans ce garde-fou, un chemin inexistant ferait executer git dans le
+  ; repertoire courant (RunProgram ignore un working dir invalide).
+  If RepoPath <> "" And FileSize(RepoPath) <> -2
+    *R\ExitCode = 1
+    *R\ErrText = "Repertoire introuvable : " + RepoPath
+    ProcedureReturn 1
+  EndIf
+
   Protected Cmd.s = Chr(34) + G_GitExe + Chr(34) + " " + GitArgs
   Protected Prog.i
+  Protected Script.s = ""
   CompilerIf #PB_Compiler_OS = #PB_OS_Windows
     ; cmd.exe exige la forme /c "<commande>" quand la commande commence par
     ; un chemin entre guillemets (idiome documente de cmd).
     Prog = RunProgram("cmd.exe", "/c " + Chr(34) + Cmd + " 2>&1" + Chr(34), RepoPath, #PB_Program_Open | #PB_Program_Read | #PB_Program_Hide)
   CompilerElse
-    Prog = RunProgram("/bin/sh", "-c '" + Cmd + " 2>&1'", RepoPath, #PB_Program_Open | #PB_Program_Read | #PB_Program_Hide)
+    ; RunProgram ne gere pas les guillemets dans les arguments sous Linux :
+    ; on passe par un script sh temporaire (stderr fusionne).
+    Script = GetTemporaryDirectory() + "mcp_git_" + Str(Date()) + "_" + Str(Random(999999)) + ".sh"
+    Protected F.i = CreateFile(#PB_Any, Script)
+    If F
+      WriteString(F, Cmd + " 2>&1" + #LF$, #PB_UTF8)
+      CloseFile(F)
+    EndIf
+    Prog = RunProgram("/bin/sh", Script, RepoPath, #PB_Program_Open | #PB_Program_Read | #PB_Program_Hide)
   CompilerEndIf
   If Prog = 0
     *R\ErrText = "Impossible de lancer git (" + G_GitExe + ")."
@@ -111,6 +128,7 @@ Procedure.i GitRun(RepoPath.s, GitArgs.s, *R.GitResult)
   WaitProgram(Prog)
   *R\ExitCode = ProgramExitCode(Prog)
   CloseProgram(Prog)
+  If Script <> "" : DeleteFile(Script) : EndIf
   ProcedureReturn *R\ExitCode
 EndProcedure
 
@@ -129,6 +147,8 @@ Procedure.s GitFailText(*R.GitResult, Action.s)
   Protected Msg.s = "Erreur : " + Action + " (code " + Str(*R\ExitCode) + ")."
   If Trim(*R\Output) <> ""
     Msg + #LF$ + Trim(*R\Output)
+  ElseIf Trim(*R\ErrText) <> ""
+    Msg + #LF$ + Trim(*R\ErrText)
   EndIf
   ProcedureReturn Msg
 EndProcedure

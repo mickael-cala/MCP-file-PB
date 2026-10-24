@@ -16,13 +16,14 @@
 
 | Critère | État |
 |---|---|
-| Tests unitaires des modules et serveurs | ✅ 24 + 33 + 37 + 19 + 24 + 40 = **177** |
+| Tests unitaires des modules et serveurs | ✅ 24 + 33 + 37 + 19 + 24 + 40 = **177** (Windows et Linux) |
 | Tests d'intégration (8 serveurs) | ✅ **100/100** |
 | `run_all.bat` / `run_all.sh` vert | ✅ **10/10 étapes** |
 | Erreurs MCP en `isError: true` avec message clair | ✅ heuristique `DetectIsError` + refus explicites |
 | Aucun secret loggé ni renvoyé | ✅ tokens/clés jamais inclus dans les réponses ; logs stderr |
 | Documentation README complète | ✅ (outils, env, build, tests, config client) |
 | Release publiée | ✅ v1.0.0 (tag + binaires Windows + SHA256SUMS) |
+| Validation Linux | ✅ WSL2 Ubuntu 26.04 (compilation 8 serveurs + 10/10) |
 | Robustesse (T6.1–T6.8) | ✅ 17/17 vérifications (charge 10k via `MCP_STRESS_REQUESTS`) |
 | Performances cibles (T6.9–T6.14) | ✅ atteintes (T6.14 conditionnel à une clé Context7) |
 

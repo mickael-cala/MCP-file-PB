@@ -31,12 +31,12 @@ echo
 echo "=== Compilation des tests unitaires ==="
 mkdir -p build
 COMPILE_UT=1
-"$PBC" tests/test_common.pb /EXE "build/test_common" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
-"$PBC" tests/test_memory.pb /EXE "build/test_memory" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
-"$PBC" tests/test_database.pb /EXE "build/test_database" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
-"$PBC" tests/test_context7.pb /EXE "build/test_context7" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
-"$PBC" tests/test_git.pb /EXE "build/test_git" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
-"$PBC" tests/test_github.pb /EXE "build/test_github" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
+"$PBC" tests/test_common.pb -o "build/test_common" -cl -t || COMPILE_UT=0
+"$PBC" tests/test_memory.pb -o "build/test_memory" -cl -t || COMPILE_UT=0
+"$PBC" tests/test_database.pb -o "build/test_database" -cl -t || COMPILE_UT=0
+"$PBC" tests/test_context7.pb -o "build/test_context7" -cl -t || COMPILE_UT=0
+"$PBC" tests/test_git.pb -o "build/test_git" -cl -t || COMPILE_UT=0
+"$PBC" tests/test_github.pb -o "build/test_github" -cl -t || COMPILE_UT=0
 if [ "$COMPILE_UT" -eq 1 ]; then
     ok
 else

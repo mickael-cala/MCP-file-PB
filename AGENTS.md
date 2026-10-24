@@ -12,7 +12,8 @@ travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
      `C:\Program Files\PureBasic\Compilers\pbcompiler.exe`,
      `C:\PureBasic\Compilers\pbcompiler.exe`, puis le `PATH` ;
    - Python 3 (tests d'intégration uniquement, aucune dépendance externe) ;
-   - `git` dans le PATH (serveur `gitMCP` et workflow de commit).
+   - `git` dans le PATH (serveur `gitMCP` et workflow de commit) ;
+   - Linux : `libssl-dev`, `libsqlite3-dev`, `curl` ; macOS : `curl`.
 3. **Synchroniser et vérifier la base** :
    ```bash
    git pull
@@ -22,9 +23,22 @@ travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
    Attendu : **10/10 étapes**, **177 tests unitaires** (24+33+37+19+24+40),
    **17/17 robustesse/performance** et **100/100 tests d'intégration**. Si ce n'est pas le cas, corriger avant
    toute nouvelle fonctionnalité.
-4. **Choisir la suite** : Phase 6 (robustesse/performances) est la prochaine
-   étape du plan ; sinon, voir ROADMAP.md. Ne jamais démarrer une phase sans
-   avoir vert `run_all`.
+4. **Choisir la suite** : voir [ROADMAP.md](ROADMAP.md). Ne jamais démarrer
+   une phase sans avoir vert `run_all`.
+
+### Validation Linux (WSL2)
+
+```bash
+# dans WSL : installer les dependances
+sudo apt install -y libssl-dev libsqlite3-dev curl
+# pointer PBCOMPILER vers le compilateur Linux (licence ou demo)
+export PBCOMPILER=$HOME/purebasic-demo/purebasic_demo/compilers/pbcompiler
+export PUREBASIC_HOME=$HOME/purebasic-demo/purebasic_demo
+./build.sh && ./run_all.sh
+```
+Attendu : 10/10 étapes (177 unitaires, 17 robustesse/perf, 100 intégration).
+Attention : `build/` est partagé avec Windows si le dépôt est sur `/mnt/c` —
+relancer `build.bat` après une validation Linux.
 
 ## Règle absolue : documentation synchronisée AVANT chaque commit
 
@@ -165,8 +179,13 @@ Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
   boucle jusqu'à `ProgramRunning() = 0` (sinon sortie vide). stderr n'est pas
   lisible de façon fiable → passer par le shell avec `2>&1`
   (`cmd.exe /c ""exe" args 2>&1"`) après validation stricte des entrées.
-- **HTTP avec en-têtes** : seuls WinHTTP (Windows) les supporte ; pas d'API
-  d'en-têtes dans le HTTP intégré de PureBasic.
+- **HTTP avec en-têtes** : WinHTTP sous Windows ; sous Linux/macOS, le HTTP
+  intégré n'offre pas d'en-têtes → `mcp_common/http.pbi` passe par **curl**
+  (fichier de configuration, pas de quoting shell).
+- **RunProgram sous Linux** ne gère pas les guillemets dans les arguments :
+  écrire un script temporaire (`git_core.pbi` le fait) ou passer par curl -K.
+- **Fins de ligne** : `.gitattributes` impose LF aux `.sh/.py/.pb/.pbi/.md`
+  (un shebang en CRLF casse l'exécution sous WSL) ; `.bat` en CRLF.
 - **IDE/projets** : `.pbi` = module d'inclusion ; un projet IDE est un `.pbp`
   (non fourni, voir README). Ne pas inventer de format de projet.
 

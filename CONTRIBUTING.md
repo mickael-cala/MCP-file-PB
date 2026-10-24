@@ -18,6 +18,7 @@ avec les modèles fournis (bug, fonctionnalité). Incluez si possible :
 1. Forkez le dépôt et créez une branche depuis `main`.
 2. Modifiez le code source concerné dans `src/` (le cœur métier d'un serveur
    est dans `src/<serveur>_core.pbi`, le `.pb` ne contient que le `main`).
+   Prérequis Linux : `sudo apt install libssl-dev libsqlite3-dev curl`.
 3. Vérifiez que tout passe :
    ```bash
    build.bat            # ou ./build.sh : compile les 8 serveurs

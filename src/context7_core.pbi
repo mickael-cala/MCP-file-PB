@@ -20,7 +20,7 @@ Global G_C7ApiBase.s = "https://context7.com/api/v1"
 Procedure.s C7HttpErrorText(Status.i, Prefix.s)
   Select Status
     Case -2
-      ProcedureReturn Prefix + " : l'en-tete Authorization n'est pas supportee sur cet OS (HTTP integre sans en-tetes). Cles API : Windows requis."
+      ProcedureReturn Prefix + " : curl est introuvable ou a echoue sur cet OS (necessaire pour les en-tetes HTTP)."
     Case -1
       ProcedureReturn Prefix + " : echec reseau (DNS, connexion ou timeout)."
     Case 401
