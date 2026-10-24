@@ -10,17 +10,19 @@ Serveurs MCP écrits en **PureBasic** (3 exécutables), sources dans `src/` :
 - `fileMCP.pb` — gestion de fichiers confinée (`MCP_ROOT`/`MCP_ROOT_SECRET`)
 - `MCP-Fetch-PB.pb` — fetch web (HTML → Markdown, protection SSRF)
 - `MCP-SequentialThinking-PB.pb` — raisonnement séquentiel
+- `memoryMCP.pb` + `memory_core.pbi` — mémoire SQLite (`MCP_MEMORY_DB`)
 
 Transport **JSON-RPC 2.0 sur stdin/stdout**, une ligne JSON par message.
 Exécutables **console**, 100 % natifs, multi-OS (Windows / Linux / macOS).
-Pas de dépendance externe.
+Pas de dépendance externe. Le cœur métier d'un serveur va dans un
+`src/<serveur>_core.pbi` (testable), le `.pb` ne contient que le `main`.
 
 ## Commandes essentielles
 
 ```bash
 build.bat              # Windows : compile -> build\fileMCP.exe
 ./build.sh             # Linux/macOS : compile -> build/fileMCP
-python tests/test_mcp.py   # tests fonctionnels (17 tests, doit être 17/17)
+python tests/test_mcp.py   # tests fonctionnels (44 tests, doit être 44/44)
 ./clean.sh             # nettoie build/
 ```
 
@@ -71,13 +73,15 @@ mcp_common/                       modules partages (stdio, logging, json_helpers
 src/fileMCP.pb                    gestion de fichiers
 src/MCP-Fetch-PB.pb               fetch web
 src/MCP-SequentialThinking-PB.pb  raisonnement sequentiel
+src/memoryMCP.pb + memory_core.pbi  memoire SQLite
 src/*.pbi                         fichiers projet IDE PureBasic (fileMCP)
 examples/minimal_server.pb        serveur MCP minimal de demo
-build.bat/build.sh                compilation des 3 serveurs ; clean.* : nettoyage
+build.bat/build.sh                compilation des 4 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
-tests/test_mcp.py                 tests d'integration des 3 serveurs (26 tests)
+tests/test_mcp.py                 tests d'integration des 4 serveurs (44 tests)
 tests/unit_test.pbi + test_common.pb  framework + tests unitaires (24 tests)
+tests/test_memory.pb              tests unitaires Memory (33 tests)
 ```
 
 Voir aussi : [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md),

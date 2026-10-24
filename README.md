@@ -7,6 +7,7 @@ Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) �
 | **fileMCP** | `src/fileMCP.pb` | 10 outils | Gestion de fichiers confinée à une racine (`MCP_ROOT`) |
 | **MCP-Fetch-PB** | `src/MCP-Fetch-PB.pb` | `fetch` | Récupération de pages web, conversion HTML → Markdown |
 | **MCP-SequentialThinking-PB** | `src/MCP-SequentialThinking-PB.pb` | `sequential_thinking` | Raisonnement séquentiel structuré (étapes, révisions, branches) |
+| **memoryMCP** | `src/memoryMCP.pb` + `src/memory_core.pbi` | 9 outils | Graphe d'entites persistant en SQLite (`MCP_MEMORY_DB`) : entites, observations, relations |
 
 Caractéristiques communes :
 
@@ -45,6 +46,22 @@ Les URLs non HTTP/HTTPS et les IPs littérales sont refusées (SSRF) ; un timeou
 |---|---|---|
 | `sequential_thinking` | Enregistre une étape de raisonnement et retourne l'état courant (numéro, total, historique, branches) | `thought`, `thoughtNumber`, `totalThoughts`, `nextThoughtNeeded`, `isRevision` (défaut false), `revisesThought` (défaut 0), `branchFromThought` (défaut 0), `branchId` |
 
+### memoryMCP — mémoire persistante (SQLite)
+
+| Outil | Description | Paramètres |
+|---|---|---|
+| `create_entities` | Crée des entités avec leurs observations (doublons ignorés) | `entities[]` : `{name, entityType, observations[]}` |
+| `create_relations` | Crée des relations entre entités existantes | `relations[]` : `{from, to, relationType}` |
+| `add_observations` | Ajoute des observations à des entités existantes | `observations[]` : `{entityName, contents[]}` |
+| `delete_entities` | Supprime des entités (cascade observations + relations) | `entityNames[]` |
+| `delete_observations` | Supprime des observations précises | `observations[]` : `{entityName, contents[]}` |
+| `delete_relations` | Supprime des relations précises | `relations[]` : `{from, to, relationType}` |
+| `read_graph` | Retourne tout le graphe en JSON | — |
+| `search_nodes` | Recherche insensible à la casse (nom, type, observations) | `query` |
+| `open_nodes` | Retourne des entités par nom avec relations internes | `names[]` |
+
+La base est un fichier SQLite créé automatiquement (chemin : `MCP_MEMORY_DB`, défaut `memory.db`). Les noms sont échappés (pas d'injection SQL) et les suppressions d'entités cascadent via les clés étrangères.
+
 ⚠️ **Attention** : `write_file`, `delete_file`, `move_file` et `change_root` sont des opérations destructrices ou sensibles. Ne connectez ce serveur qu'à un répertoire dont la perte de contenu serait acceptable.
 
 ## Sécurité
@@ -53,6 +70,7 @@ Les URLs non HTTP/HTTPS et les IPs littérales sont refusées (SSRF) ; un timeou
 |---|---|---|
 | `MCP_ROOT` | Répertoire racine autorisé pour toutes les opérations. Si absent, le répertoire courant du serveur est utilisé. | fileMCP |
 | `MCP_ROOT_SECRET` | Mot de passe requis par l'outil `change_root` pour modifier la racine autorisée à chaud. | fileMCP |
+| `MCP_MEMORY_DB` | Chemin du fichier SQLite de la mémoire (créé automatiquement si absent). Défaut : `memory.db`. | memoryMCP |
 
 Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils tentent de sortir de la racine autorisée. Voir [SECURITY.md](SECURITY.md).
 
@@ -67,13 +85,13 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ./build.sh     # Linux/macOS -> memes noms sans extension
 ```
 
-Les scripts compilent les 3 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+Les scripts compilent les 4 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 
 ### Via l'IDE PureBasic
 
-Pour fileMCP, ouvrez le fichier projet de votre plateforme (`src/fileMCP_Windows.pbi`, `src/fileMCP_Linux.pbi`, `src/fileMCP_macOS.pbi`) et compilez (`F5`). Pour les deux autres serveurs, ouvrez directement le `.pb` dans l'IDE et compilez en format Console.
+Pour fileMCP, ouvrez le fichier projet de votre plateforme (`src/fileMCP_Windows.pbi`, `src/fileMCP_Linux.pbi`, `src/fileMCP_macOS.pbi`) et compilez (`F5`). Pour les autres serveurs, ouvrez directement le `.pb` dans l'IDE et compilez en format Console.
 
 Les exécutables compilés ne sont pas versionnés : publiez-les via [GitHub Releases](https://docs.github.com/fr/repositories/releasing-projects-on-github) si besoin.
 
@@ -87,18 +105,19 @@ run_all.bat        # ou ./run_all.sh : tout verifier
 ```
 
 - **Unitaires (PureBasic)** : `tests/unit_test.pbi` (micro-framework) +
-  `tests/test_common.pb` (24 tests sur `mcp_common/`). Chaque futur module
-  ajoutera un `tests/test_<module>.pb`.
+  `tests/test_common.pb` (24 tests sur `mcp_common/`) et
+  `tests/test_memory.pb` (33 tests sur le serveur Memory). Chaque futur module
+  ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
-  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (26 tests qui
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (44 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
-python tests/test_mcp.py                          # les 3 serveurs
-python tests/test_mcp.py fileMCP                  # un seul serveur
+python tests/test_mcp.py                          # les 4 serveurs
+python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-26 tests au total. Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`) force un chemin.
+44 tests au total. Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -119,6 +138,12 @@ Exemple générique (les trois serveurs) :
     },
     "sequential-thinking-pb": {
       "command": "/chemin/vers/build/MCP-SequentialThinking-PB"
+    },
+    "memory-pb": {
+      "command": "/chemin/vers/build/memoryMCP",
+      "env": {
+        "MCP_MEMORY_DB": "/chemin/vers/memory.db"
+      }
     }
   }
 }
@@ -142,6 +167,8 @@ src/
 ├── fileMCP.pb                    # Serveur gestion de fichiers (multi-OS)
 ├── MCP-Fetch-PB.pb               # Serveur fetch web (HTML -> Markdown)
 ├── MCP-SequentialThinking-PB.pb  # Serveur raisonnement sequentiel
+├── memoryMCP.pb                  # Serveur memoire (main)
+├── memory_core.pbi               # Coeur metier Memory (SQLite, testable)
 ├── fileMCP_Windows.pbi           # Projet IDE PureBasic — Windows
 ├── fileMCP_Linux.pbi             # Projet IDE PureBasic — Linux
 └── fileMCP_macOS.pbi             # Projet IDE PureBasic — macOS
@@ -152,9 +179,10 @@ clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
-├── test_mcp.py             # Tests fonctionnels des 3 serveurs (26 tests)
+├── test_mcp.py             # Tests fonctionnels des 4 serveurs (44 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
-└── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
+├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
+└── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
 ```
 
 Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), renseignez les hooks `*G_ToolHandler` / `*G_CatalogBuilder` et appelez `MCPMainLoop()`.

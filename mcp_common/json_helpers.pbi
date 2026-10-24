@@ -44,6 +44,19 @@ Procedure.i GetArgBool(ArgsObj.i, Key.s, DefaultVal.i)
   ProcedureReturn DefaultVal
 EndProcedure
 
+; Retourne le membre tableau d'un objet d'arguments, ou #Null s'il est
+; absent ou n'est pas un tableau. Iterer ensuite avec JSONArraySize() /
+; GetJSONElement().
+Procedure.i GetArgArray(ArgsObj.i, Key.s)
+  If ArgsObj And JSONType(ArgsObj) = #PB_JSON_Object
+    Protected Member.i = GetJSONMember(ArgsObj, Key)
+    If Member And JSONType(Member) = #PB_JSON_Array
+      ProcedureReturn Member
+    EndIf
+  EndIf
+  ProcedureReturn #Null
+EndProcedure
+
 ; ---------------------------------------------------------------------------
 ; Construction de proprietes de schéma d'outil
 ; ---------------------------------------------------------------------------

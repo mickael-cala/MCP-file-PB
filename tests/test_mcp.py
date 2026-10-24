@@ -19,6 +19,7 @@ Usage :
 """
 
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -173,10 +174,97 @@ def run_tests_fetch():
         check("URL invalide signalee en erreur", err, text[:120])
 
 
+# ---------------------------------------------------------------------------
+# Suite memoryMCP (graphe d'entites SQLite)
+# ---------------------------------------------------------------------------
+
+def run_tests_memory():
+    with tempfile.TemporaryDirectory(prefix="memorymcp-test-") as tmp:
+        env = {"MCP_MEMORY_DB": str(Path(tmp) / "memory.db")}
+        with MCPTestClient(find_binary("memoryMCP"), env=env) as client:
+            run_checks_memory(client)
+
+
+def run_checks_memory(client):
+    print("\n== Memory : tools/list ==")
+    names = client.list_tools()
+    expected = {
+        "create_entities", "create_relations", "add_observations",
+        "delete_entities", "delete_observations", "delete_relations",
+        "read_graph", "search_nodes", "open_nodes",
+    }
+    check("tools/list retourne 9 outils", len(names) == 9, f"obtenu: {names}")
+    check("catalogue conforme", set(names) == expected, f"diff: {set(names) ^ expected}")
+
+    print("\n== Memory : cycle complet create -> search -> add -> delete ==")
+    err, text = client.tool_text("create_entities", {"entities": [
+        {"name": "Alice", "entityType": "person", "observations": ["aime le cafe"]},
+        {"name": "Bob", "entityType": "person", "observations": []},
+    ]})
+    check("create_entities ok", not err, text)
+
+    err, text = client.tool_text("create_relations", {"relations": [
+        {"from": "Alice", "to": "Bob", "relationType": "connait"},
+    ]})
+    check("create_relations ok", not err, text)
+
+    err, text = client.tool_text("search_nodes", {"query": "cafe"})
+    check("search_nodes trouve par observation", not err and "Alice" in text, text[:120])
+
+    err, text = client.tool_text("search_nodes", {"query": "bob"})
+    check("search_nodes insensible a la casse", not err and "Bob" in text, text[:120])
+
+    err, text = client.tool_text("add_observations", {"observations": [
+        {"entityName": "Alice", "contents": ["deuxieme observation"]},
+    ]})
+    check("add_observations ok", not err, text)
+
+    err, text = client.tool_text("open_nodes", {"names": ["Alice", "Bob"]})
+    check("open_nodes retourne les 2 entites", not err and "Alice" in text and "Bob" in text, text[:120])
+    check("observation ajoutee visible", "deuxieme observation" in text)
+
+    err, text = client.tool_text("read_graph", {})
+    check("read_graph contient la relation", not err and "connait" in text, text[:120])
+
+    print("\n== Memory : securite et erreurs ==")
+    err, text = client.tool_text("create_entities", {"entities": [
+        {"name": "Robert'); DROP TABLE entities;--", "entityType": "person"},
+    ]})
+    check("injection SQL echappee", not err, text[:120])
+    err, text = client.tool_text("read_graph", {})
+    check("table intacte apres injection", not err, text[:120])
+
+    err, text = client.tool_text("create_relations", {"relations": [
+        {"from": "Inconnu", "to": "Bob", "relationType": "x"},
+    ]})
+    check("relation sur entite inconnue refusee", err, text[:120])
+
+    err, text = client.tool_text("add_observations", {"observations": [
+        {"entityName": "Fantome", "contents": ["x"]},
+    ]})
+    check("observation sur entite inconnue refusee", err, text[:120])
+
+    print("\n== Memory : suppressions ==")
+    err, text = client.tool_text("delete_observations", {"observations": [
+        {"entityName": "Alice", "contents": ["aime le cafe"]},
+    ]})
+    check("delete_observations ok", not err, text)
+    err, text = client.tool_text("delete_relations", {"relations": [
+        {"from": "Alice", "to": "Bob", "relationType": "connait"},
+    ]})
+    check("delete_relations ok", not err, text)
+    err, text = client.tool_text("delete_entities", {"entityNames": ["Alice"]})
+    check("delete_entities ok", not err, text)
+    err, text = client.tool_text("open_nodes", {"names": ["Alice"]})
+    compact = re.sub(r"\s+", "", text)
+    check("Alice supprimee (cascade)", not err and '"entities":[]' in compact, text[:120])
+
+
 SUITES = {
     "fileMCP": run_tests_filemcp,
     "MCP-SequentialThinking-PB": run_tests_sequential,
     "MCP-Fetch-PB": run_tests_fetch,
+    "memoryMCP": run_tests_memory,
 }
 
 

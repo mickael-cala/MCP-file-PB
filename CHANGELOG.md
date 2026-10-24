@@ -4,6 +4,26 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 1 — Memory/SQLite)
+- **`memoryMCP`** : serveur MCP de mémoire persistante (`src/memoryMCP.pb` +
+  `src/memory_core.pbi`) — 9 outils : `create_entities`, `create_relations`,
+  `add_observations`, `delete_entities`, `delete_observations`,
+  `delete_relations`, `read_graph`, `search_nodes`, `open_nodes`.
+  SQLite embarque (bibliotheque PureBasic, 0 dependance), chemin via
+  `MCP_MEMORY_DB` (defaut `memory.db`), schema auto-cree, cascades FK
+  activees, echappement SQL (doublage des apostrophes).
+- `tests/test_memory.pb` : 33 tests unitaires (T1.1-T1.18 du plan).
+- Suite d'integration Memory dans `tests/test_mcp.py` (cycle complet +
+  securite injection SQL) : **44 tests au total**.
+- `build.bat`/`build.sh` compilent 4 serveurs ; `run_all` ajoute l'etape
+  des tests unitaires Memory.
+
+### Corrigé
+- `memory_core.pbi` : boucle infinie dans `BuildGraphJSON` (un `ForEach`
+  interne deplacait le curseur du `ForEach` externe) — remplace par une
+  map de membership.
+- `mcp_common/json_helpers.pbi` : ajout de `GetArgArray` (membres tableau).
+
 ### Ajouté (Phase 0 — infrastructure commune et harnais de test)
 - **`mcp_common/`** : modules partages par tous les serveurs —
   `stdio.pbi` (E/S stdio multi-OS), `logging.pbi` (logs sur stderr),

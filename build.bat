@@ -23,7 +23,7 @@ if not defined PBC (
 
 if not exist build mkdir build
 
-for %%S in (fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB) do (
+for %%S in (fileMCP MCP-Fetch-PB MCP-SequentialThinking-PB memoryMCP) do (
     echo Compilation de src\%%S.pb ...
     "%PBC%" "src\%%S.pb" /EXE "build\%%S.exe" /CONSOLE /UNICODE /THREAD
     if errorlevel 1 (

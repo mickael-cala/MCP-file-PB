@@ -31,13 +31,19 @@ call :ok "compilation serveurs"
 echo.
 echo === Compilation des tests unitaires ===
 if not exist build mkdir build
-"%PBC%" tests\test_common.pb /EXE build\test_common.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests unitaires" & goto :report)
+"%PBC%" tests\test_common.pb /EXE build\test_common.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests communs" & goto :report)
+"%PBC%" tests\test_memory.pb /EXE build\test_memory.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests memory" & goto :report)
 call :ok "compilation tests unitaires"
 
 echo.
-echo === Tests unitaires PureBasic ===
-build\test_common.exe 2>&1 || (call :ko "tests unitaires" & goto :report)
-call :ok "tests unitaires"
+echo === Tests unitaires communs ===
+build\test_common.exe 2>&1 || (call :ko "tests unitaires communs" & goto :report)
+call :ok "tests unitaires communs"
+
+echo.
+echo === Tests unitaires Memory ===
+build\test_memory.exe 2>&1 || (call :ko "tests unitaires memory" & goto :report)
+call :ok "tests unitaires memory"
 
 echo.
 echo === Tests d'integration Python ===

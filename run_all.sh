@@ -30,18 +30,29 @@ if ./build.sh; then ok; else ko "compilation serveurs"; fi
 echo
 echo "=== Compilation des tests unitaires ==="
 mkdir -p build
-if "$PBC" tests/test_common.pb /EXE "build/test_common" /CONSOLE /UNICODE /THREAD; then
+COMPILE_UT=1
+"$PBC" tests/test_common.pb /EXE "build/test_common" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
+"$PBC" tests/test_memory.pb /EXE "build/test_memory" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
+if [ "$COMPILE_UT" -eq 1 ]; then
     ok
 else
     ko "compilation tests unitaires"
 fi
 
 echo
-echo "=== Tests unitaires PureBasic ==="
+echo "=== Tests unitaires communs ==="
 if [ -x build/test_common ] && ./build/test_common; then
     ok
 else
-    ko "tests unitaires"
+    ko "tests unitaires communs"
+fi
+
+echo
+echo "=== Tests unitaires Memory ==="
+if [ -x build/test_memory ] && ./build/test_memory; then
+    ok
+else
+    ko "tests unitaires memory"
 fi
 
 echo
