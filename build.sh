@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  build.sh - Compile les 3 serveurs MCP (PureBasic) pour Linux / macOS
+#  build.sh - Compile les 8 serveurs MCP (PureBasic) pour Linux / macOS
 #  Le compilateur est cherche dans l'ordre :
 #    1. variable d'environnement PBCOMPILER
 #    2. pbcompiler dans le PATH

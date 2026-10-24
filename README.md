@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/mickael-cala/MCP-file-PB)](https://github.com/mickael-cala/MCP-file-PB/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Huit serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) écrits en **PureBasic**, 100 % natifs, qui exposent des outils à un client IA (Claude Desktop, Kimi Code, etc.) via **JSON-RPC 2.0 sur stdin/stdout** :
+Huit serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) écrits en **PureBasic**, 100 % natifs, qui exposent **45 outils** à un client IA (Claude Desktop, Kimi Code, etc.) via **JSON-RPC 2.0 sur stdin/stdout** :
 
 | Serveur | Source | Outil(s) | Description |
 |---|---|---|---|
@@ -133,6 +133,7 @@ Sécurité : token jamais renvoyé dans les messages ; écritures refusées sans
 | `MCP_DB_POSTGRES_DSN` | Chaîne de connexion PostgreSQL (ex. `host=localhost dbname=test`). Si absente, l'engine `postgres` retourne une erreur claire. | dbMCP |
 | `MCP_DB_ALLOW_WRITE` | `1` = autorise les requêtes d'écriture (INSERT/UPDATE/DELETE/DDL). Défaut : lecture seule. | dbMCP |
 | `MCP_CONTEXT7_API_KEY` | Clé API Context7 (préfixe `ctx7sk`, https://context7.com). Requise par `query_docs` ; `resolve_library_id` fonctionne sans. | context7MCP |
+| `MCP_CONTEXT7_API_BASE` | Base de l'API Context7 (défaut `https://context7.com/api/v1`) ; utile pour les tests. | context7MCP |
 | `MCP_GIT_EXE` | Chemin de l'exécutable git si absent du PATH. | gitMCP |
 | `MCP_GITHUB_TOKEN` | Token GitHub (PAT). Requis par tous les outils githubMCP. | githubMCP |
 | `MCP_GITHUB_API_BASE` | Base de l'API (défaut `https://api.github.com`) ; sert aux tests avec un mock. | githubMCP |
@@ -216,7 +217,7 @@ Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variab
 
 ## Configuration d'un client MCP
 
-Exemple générique (les trois serveurs) :
+Exemple générique (les huit serveurs ; configuration complète : `examples/mcp.json`) :
 
 ```json
 {
@@ -244,6 +245,12 @@ Exemple générique (les trois serveurs) :
       "command": "/chemin/vers/build/dbMCP",
       "env": {
         "MCP_DB_PATH": "/chemin/vers/database.db"
+      }
+    },
+    "context7-pb": {
+      "command": "/chemin/vers/build/context7MCP",
+      "env": {
+        "MCP_CONTEXT7_API_KEY": "ctx7sk_..."
       }
     },
     "git-pb": {

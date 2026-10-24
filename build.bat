@@ -1,7 +1,7 @@
 @echo off
 setlocal
 rem ============================================================================
-rem  build.bat - Compile les 3 serveurs MCP (PureBasic) pour Windows
+rem  build.bat - Compile les 8 serveurs MCP (PureBasic) pour Windows
 rem  Le compilateur est cherche dans l'ordre :
 rem    1. variable d'environnement PBCOMPILER
 rem    2. C:\Program Files\PureBasic\Compilers\pbcompiler.exe (installation par defaut)

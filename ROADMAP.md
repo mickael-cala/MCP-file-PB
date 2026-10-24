@@ -1,6 +1,6 @@
 # Feuille de route
 
-Les phases 0 à 6 du plan sont terminées (voir [PLAN.md](PLAN.md)) et la
+Les 8 serveurs MCP (phases 0 à 6, voir [PLAN.md](PLAN.md)) sont livrés et la
 **v1.0.0** est publiée. Cette feuille de route couvre la suite.
 
 ## Court terme
@@ -13,6 +13,8 @@ Les phases 0 à 6 du plan sont terminées (voir [PLAN.md](PLAN.md)) et la
 
 ## Moyen terme
 
+- **Fetch/SequentialThinking** : extraction HTML→Markdown plus riche (tableaux,
+  code), persistance optionnelle de l'historique de raisonnement.
 - **FileMCP** : `copy_file`, suppression récursive optionnelle, pagination de
   `list_files`/`search_files`, lecture binaire base64.
 - **Memory** : recherche plein texte (FTS5), export/import JSON du graphe.

@@ -1,5 +1,18 @@
 # Errata — limitations et problèmes connus
 
+## Couverture par serveur
+
+| Serveur | Limitations connues |
+|---|---|
+| `fileMCP` | `read_file` tronqué à 20 Ko, `read_file_lines` ≤ 5 Mo, dossiers non vides non supprimés |
+| `MCP-Fetch-PB` | conversion HTML→Markdown basique ; pas de JS ; hôtes privés refusés |
+| `MCP-SequentialThinking-PB` | état en mémoire (perdu à l'arrêt) ; pas de persistance |
+| `memoryMCP` | une instance écrit à la fois (SQLite, pas de WAL) ; pas de FTS |
+| `dbMCP` | lecture seule par défaut ; PostgreSQL sans binding de paramètres |
+| `context7MCP` | `query_docs` exige une clé ; hors ligne → erreur explicite |
+| `gitMCP` | sous-processus git requis ; sortie plafonnée à 40 Ko |
+| `githubMCP` | token requis ; écritures via `confirm=true` ; pagination manuelle |
+
 ## Limitations par design
 
 - **`read_file` tronque au-delà de 20 000 octets** ; utiliser `read_file_lines`

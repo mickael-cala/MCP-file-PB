@@ -28,6 +28,23 @@
 | Robustesse (T6.1–T6.8) | ✅ 17/17 vérifications (charge 10k via `MCP_STRESS_REQUESTS`) |
 | Performances cibles (T6.9–T6.14) | ✅ atteintes (T6.14 conditionnel à une clé Context7) |
 
+## Serveurs livrés (8)
+
+| Serveur | Outils | Tests unitaires | Tests d'intégration | Documentation |
+|---|---|---|---|---|
+| `fileMCP` | 10 | — (intégration) | 17 | README, SECURITY |
+| `MCP-Fetch-PB` | 1 | — (intégration) | 3 | README |
+| `MCP-SequentialThinking-PB` | 1 | — (intégration) | 6 | README |
+| `memoryMCP` | 9 | 33 | 18 | README, SECURITY, ERRATA |
+| `dbMCP` | 5 | 37 | 12 | README, SECURITY, ERRATA |
+| `context7MCP` | 2 | 19 | 7 | README, SECURITY, ERRATA |
+| `gitMCP` | 7 | 24 | 12 | README, SECURITY, ERRATA |
+| `githubMCP` | 10 | 40 | 25 | README, SECURITY, ERRATA |
+
+Total : **45 outils**, **177 tests unitaires**, **100 tests d'intégration**.
+Les serveurs sans `*_core.pbi` (Fetch, SequentialThinking) sont couverts par
+l'intégration, sans suite unitaire dédiée.
+
 ## Détail des phases
 
 ### Phase 0 — Infrastructure (terminée)

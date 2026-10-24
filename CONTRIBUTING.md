@@ -3,6 +3,9 @@
 Merci de votre intérêt ! Ce dépôt est un projet personnel, mais les
 signalements de bugs et les suggestions sont les bienvenus.
 
+Le dépôt contient **8 serveurs MCP** (45 outils) ; voir la liste et les
+variables d'environnement dans [README.md](README.md).
+
 ## Signaler un bug ou proposer une fonctionnalité
 
 Utilisez les [issues GitHub](https://github.com/mickael-cala/MCP-file-PB/issues)
