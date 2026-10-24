@@ -4,6 +4,30 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Ajouté (Phase 5 — GitHub)
+- **`githubMCP`** : serveur MCP de l'API REST GitHub (`src/githubMCP.pb` +
+  `src/github_core.pbi`) — 10 outils : `gh_get_repo`, `gh_list_issues`,
+  `gh_get_issue`, `gh_create_issue`, `gh_list_pull_requests`,
+  `gh_get_pull_request`, `gh_create_pull_request`, `gh_list_commits`,
+  `gh_search_code`, `gh_search_repositories`.
+- **`mcp_common/http.pbi`** : couche HTTP GET/POST avec en-tetes (WinHTTP
+  sous Windows, timeout, HTTPS/HTTP), extraite de Context7 et partagee.
+- Securite : `confirm=true` obligatoire pour toute ecriture (refus = erreur
+  MCP), token jamais renvoye, pagination bornee (`per_page` max 100),
+  erreurs mappees (401/403 quota/404/422/429/5xx), validation des segments
+  d'URL (owner/repo/ref).
+- `MCP_GITHUB_API_BASE` permet de pointer un mock ; `tests/mock_github.py`
+  simule l'API (200/401/403/404/422/JSON invalide, echo des parametres).
+- `tests/test_github.pb` : 40 tests unitaires hors ligne.
+- Integration : 25 tests GitHub contre le mock — **100 tests au total**.
+- `build`/`run_all` : 8 serveurs, 6 suites de tests unitaires (9 etapes).
+- Context7 refactore sur `mcp_common/http.pbi` (code WinHTTP deduplique).
+
+### Corrige (Phase 5)
+- `SqlQuoteDb`-style : `Protected Status.Integer` (structure) utilisee comme
+  scalaire dans `github_core` — remplace par `Status.i` (statut HTTP correct).
+- `GhErrorText` : les statuts 2xx ne sont plus transformes en erreur.
+
 ### Corrigé (conformité PureBasic)
 - **Suppression de `src/fileMCP_{Windows,Linux,macOS}.pbi`** : ces fichiers
   n'étaient pas conformes — en PureBasic, `.pbi` est l'extension des fichiers

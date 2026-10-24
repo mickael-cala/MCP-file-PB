@@ -467,6 +467,108 @@ def run_checks_git(client, repo):
     check("depot inexistant -> erreur", err, text[:120])
 
 
+# ---------------------------------------------------------------------------
+# Suite githubMCP (API GitHub via mock local)
+# ---------------------------------------------------------------------------
+
+def run_tests_github():
+    from mock_github import MockGitHub
+    mock = MockGitHub()
+    base = mock.start()
+    try:
+        env = {"MCP_GITHUB_TOKEN": "ghp_test_token", "MCP_GITHUB_API_BASE": base}
+        with MCPTestClient(find_binary("githubMCP"), env=env) as client:
+            run_checks_github(client)
+        # T5.4 : sans token -> erreur explicite au premier appel
+        with MCPTestClient(find_binary("githubMCP"),
+                           env={"MCP_GITHUB_TOKEN": "", "MCP_GITHUB_API_BASE": base}) as client:
+            err, text = client.tool_text("gh_get_repo", {"owner": "o", "repo": "r"})
+            check("T5.4 sans token -> erreur explicite", err and "MCP_GITHUB_TOKEN" in text, text[:120])
+    finally:
+        mock.stop()
+
+
+def run_checks_github(client):
+    print("\n== GitHub : tools/list ==")
+    names = client.list_tools()
+    expected = {
+        "gh_get_repo", "gh_list_issues", "gh_get_issue", "gh_create_issue",
+        "gh_list_pull_requests", "gh_get_pull_request", "gh_create_pull_request",
+        "gh_list_commits", "gh_search_code", "gh_search_repositories",
+    }
+    check("tools/list retourne 10 outils", len(names) == 10, f"obtenu: {names}")
+    check("catalogue conforme", set(names) == expected, f"diff: {set(names) ^ expected}")
+
+    print("\n== GitHub : lecture ==")
+    err, text = client.tool_text("gh_get_repo", {"owner": "mock", "repo": "repo"})
+    check("T5.1 get_repo 200", not err and "mock/repo" in text, text[:120])
+
+    err, text = client.tool_text("gh_get_repo", {"owner": "o", "repo": "notfound"})
+    check("T5.2 get_repo 404 -> introuvable", err and "introuvable" in text, text[:120])
+
+    err, text = client.tool_text("gh_get_repo", {"owner": "o", "repo": "unauth"})
+    check("T5.3 get_repo 401 -> token invalide", err and "token invalide" in text, text[:120])
+
+    err, text = client.tool_text("gh_list_issues", {"owner": "o", "repo": "r"})
+    check("T5.6 per_page defaut 30", not err and '"count":30' in text.replace(" ", ""), text[:120])
+
+    err, text = client.tool_text("gh_list_issues", {
+        "owner": "o", "repo": "r", "state": "closed", "page": 2, "per_page": 7})
+    check("T5.5 state=closed transmis", not err and '"state":"closed"' in text.replace(" ", ""), text[:160])
+    check("T5.7 page=2 transmis", not err and '"page":"2"' in text.replace(" ", ""), text[:160])
+
+    err, text = client.tool_text("gh_list_issues", {"owner": "o", "repo": "r", "state": "bogus"})
+    check("state invalide refuse", err, text[:120])
+
+    err, text = client.tool_text("gh_get_issue", {"owner": "o", "repo": "r", "number": 5})
+    check("get_issue", not err and "issue detail" in text, text[:120])
+
+    err, text = client.tool_text("gh_list_pull_requests", {"owner": "o", "repo": "r"})
+    check("list PRs", not err and '"count":30' in text.replace(" ", ""), text[:120])
+
+    err, text = client.tool_text("gh_get_pull_request", {"owner": "o", "repo": "r", "number": 3})
+    check("get PR", not err and "pr detail" in text, text[:120])
+
+    err, text = client.tool_text("gh_list_commits", {"owner": "o", "repo": "r", "sha": "main"})
+    check("T5.13 sha=main transmis", not err and '"sha":"main"' in text.replace(" ", ""), text[:160])
+
+    print("\n== GitHub : ecritures (garde confirm) ==")
+    err, text = client.tool_text("gh_create_issue", {"owner": "o", "repo": "r", "title": "t"})
+    check("T5.8 create_issue sans confirm -> refus", err and "non confirmee" in text, text[:120])
+
+    err, text = client.tool_text("gh_create_issue", {"owner": "o", "repo": "r", "title": "t", "confirm": True})
+    check("T5.9 create_issue avec confirm", not err and '"number":1' in text.replace(" ", ""), text[:120])
+    check("Authorization envoyee au mock", "Bearer ghp_test_token" in text, text[:160])
+
+    err, text = client.tool_text("gh_create_issue", {
+        "owner": "o", "repo": "r", "title": "invalid", "confirm": True})
+    check("T5.10 create_issue 422 -> message", err and "validation" in text, text[:160])
+
+    err, text = client.tool_text("gh_create_pull_request", {
+        "owner": "o", "repo": "r", "title": "t", "head": "feature", "base": "main"})
+    check("create PR sans confirm -> refus", err and "non confirmee" in text, text[:120])
+
+    err, text = client.tool_text("gh_create_pull_request", {
+        "owner": "o", "repo": "r", "title": "t", "head": "feature", "base": "main", "confirm": True})
+    check("create PR avec confirm", not err and '"number":2' in text.replace(" ", ""), text[:120])
+
+    print("\n== GitHub : recherches ==")
+    err, text = client.tool_text("gh_search_code", {"query": "json parser"})
+    check("T5.12 search code", not err and "total_count" in text, text[:120])
+
+    err, text = client.tool_text("gh_search_code", {"query": "ratelimit test"})
+    check("T5.11 search 403 rate limit -> quota", err and "limite de taux" in text, text[:120])
+
+    err, text = client.tool_text("gh_search_repositories", {"query": "mcp"})
+    check("search repositories", not err and "mock/repo" in text, text[:120])
+
+    err, text = client.tool_text("gh_search_code", {"query": "a b&c=d"})
+    check("T5.14 caracteres speciaux encodes", not err and '%20b%26c%3Dd' in text, text[:160])
+
+    err, text = client.tool_text("gh_get_repo", {"owner": "o", "repo": "badjson"})
+    check("T5.15 JSON invalide -> erreur", err and "reponse GitHub invalide" in text, text[:120])
+
+
 SUITES = {
     "fileMCP": run_tests_filemcp,
     "MCP-SequentialThinking-PB": run_tests_sequential,
@@ -475,6 +577,7 @@ SUITES = {
     "dbMCP": run_tests_database,
     "context7MCP": run_tests_context7,
     "gitMCP": run_tests_git,
+    "githubMCP": run_tests_github,
 }
 
 

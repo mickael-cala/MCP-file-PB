@@ -14,6 +14,7 @@ Serveurs MCP écrits en **PureBasic** (3 exécutables), sources dans `src/` :
 - `dbMCP.pb` + `db_core.pbi` — exploration SQL (SQLite + PostgreSQL optionnel, lecture seule par defaut)
 - `context7MCP.pb` + `context7_core.pbi` — documentation Context7 (WinHTTP sous Windows)
 - `gitMCP.pb` + `git_core.pbi` — exploration de depots git locaux (sous-processus git)
+- `githubMCP.pb` + `github_core.pbi` — API REST GitHub (WinHTTP, mock pour les tests)
 
 Transport **JSON-RPC 2.0 sur stdin/stdout**, une ligne JSON par message.
 Exécutables **console**, 100 % natifs, multi-OS (Windows / Linux / macOS).
@@ -25,7 +26,7 @@ Pas de dépendance externe. Le cœur métier d'un serveur va dans un
 ```bash
 build.bat              # Windows : compile -> build\fileMCP.exe
 ./build.sh             # Linux/macOS : compile -> build/fileMCP
-python tests/test_mcp.py   # tests fonctionnels (75 tests, doit être 75/75)
+python tests/test_mcp.py   # tests fonctionnels (100 tests, doit être 100/100)
 ./clean.sh             # nettoie build/
 ```
 
@@ -80,11 +81,12 @@ src/memoryMCP.pb + memory_core.pbi  memoire SQLite
 src/dbMCP.pb + db_core.pbi        exploration SQL (sqlite + postgres)
 src/context7MCP.pb + context7_core.pbi  documentation Context7
 src/gitMCP.pb + git_core.pbi      exploration git locale
+src/githubMCP.pb + github_core.pbi  API REST GitHub
 examples/minimal_server.pb        serveur MCP minimal de demo
-build.bat/build.sh                compilation des 7 serveurs ; clean.* : nettoyage
+build.bat/build.sh                compilation des 8 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
-tests/test_mcp.py                 tests d'integration des 7 serveurs (75 tests)
+tests/test_mcp.py                 tests d'integration des 8 serveurs (100 tests)
 tests/unit_test.pbi               framework de tests unitaires PureBasic
 tests/test_common.pb              tests unitaires mcp_common (24 tests)
 tests/test_memory.pb              tests unitaires Memory (33 tests)

@@ -36,6 +36,7 @@ if not exist build mkdir build
 "%PBC%" tests\test_database.pb /EXE build\test_database.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests database" & goto :report)
 "%PBC%" tests\test_context7.pb /EXE build\test_context7.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests context7" & goto :report)
 "%PBC%" tests\test_git.pb /EXE build\test_git.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests git" & goto :report)
+"%PBC%" tests\test_github.pb /EXE build\test_github.exe /CONSOLE /UNICODE /THREAD || (call :ko "compilation tests github" & goto :report)
 call :ok "compilation tests unitaires"
 
 echo.
@@ -62,6 +63,11 @@ echo.
 echo === Tests unitaires Git ===
 build\test_git.exe 2>&1 || (call :ko "tests unitaires git" & goto :report)
 call :ok "tests unitaires git"
+
+echo.
+echo === Tests unitaires GitHub ===
+build\test_github.exe 2>&1 || (call :ko "tests unitaires github" & goto :report)
+call :ok "tests unitaires github"
 
 echo.
 echo === Tests d'integration Python ===

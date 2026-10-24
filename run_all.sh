@@ -36,6 +36,7 @@ COMPILE_UT=1
 "$PBC" tests/test_database.pb /EXE "build/test_database" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 "$PBC" tests/test_context7.pb /EXE "build/test_context7" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 "$PBC" tests/test_git.pb /EXE "build/test_git" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
+"$PBC" tests/test_github.pb /EXE "build/test_github" /CONSOLE /UNICODE /THREAD || COMPILE_UT=0
 if [ "$COMPILE_UT" -eq 1 ]; then
     ok
 else
@@ -80,6 +81,14 @@ if [ -x build/test_git ] && ./build/test_git; then
     ok
 else
     ko "tests unitaires git"
+fi
+
+echo
+echo "=== Tests unitaires GitHub ==="
+if [ -x build/test_github ] && ./build/test_github; then
+    ok
+else
+    ko "tests unitaires github"
 fi
 
 echo

@@ -14,177 +14,6 @@
 Global G_C7ApiKey.s = ""
 
 ; ---------------------------------------------------------------------------
-; Encodage URL (composant de requete : tout sauf alphanum + -._~)
-; ---------------------------------------------------------------------------
-Procedure.s UrlEncodeComponent(S.s)
-  Protected i.i, c.i, Out.s = "", Hex.s
-  For i = 1 To Len(S)
-    c = Asc(Mid(S, i, 1))
-    If (c >= 48 And c <= 57) Or (c >= 65 And c <= 90) Or (c >= 97 And c <= 122) Or c = 45 Or c = 46 Or c = 95 Or c = 126
-      Out + Chr(c)
-    Else
-      Hex = Hex(c)
-      If Len(Hex) < 2 : Hex = "0" + Hex : EndIf
-      Out + "%" + Hex
-    EndIf
-  Next
-  ProcedureReturn Out
-EndProcedure
-
-; ---------------------------------------------------------------------------
-; Couche HTTP GET avec en-tetes
-; ---------------------------------------------------------------------------
-CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-
-#WINHTTP_FLAG_SECURE = $00800000
-#WINHTTP_QUERY_STATUS_CODE = 19
-#WINHTTP_QUERY_FLAG_NUMBER = $20000000
-
-PrototypeC whttpOpen(lpszAgent.s, dwAccessType.i, lpszProxyName.i, lpszProxyBypass.i, dwFlags.i)
-PrototypeC whttpConnect(hSession.i, pswzServerName.s, nServerPort.i, dwReserved.i)
-PrototypeC whttpOpenRequest(hConnect.i, pwszVerb.s, pwszObjectName.s, pwszVersion.i, pwszReferrer.i, plpszAcceptTypes.i, dwFlagsAndAttributes.i)
-PrototypeC whttpAddRequestHeaders(hRequest.i, pwszHeaders.s, dwHeadersLength.i, dwModifiers.i)
-PrototypeC whttpSendRequest(hRequest.i, pwszHeaders.i, dwHeadersLength.i, lpOptional.i, dwOptionalLength.i, dwTotalLength.i, dwContext.i)
-PrototypeC whttpReceiveResponse(hRequest.i, lpReserved.i)
-PrototypeC whttpQueryHeaders(hRequest.i, dwInfoLevel.i, pwszName.i, lpBuffer.i, lpdwBufferLength.i, lpdwIndex.i)
-PrototypeC whttpQueryDataAvailable(hRequest.i, lpdwNumberOfBytesAvailable.i)
-PrototypeC whttpReadData(hRequest.i, lpBuffer.i, dwNumberOfBytesToRead.i, lpdwNumberOfBytesRead.i)
-PrototypeC whttpCloseHandle(hInternet.i)
-
-Global hWinHTTP.i = 0
-Global whttp_WinHttpOpen.whttpOpen
-Global whttp_WinHttpConnect.whttpConnect
-Global whttp_WinHttpOpenRequest.whttpOpenRequest
-Global whttp_WinHttpAddRequestHeaders.whttpAddRequestHeaders
-Global whttp_WinHttpSendRequest.whttpSendRequest
-Global whttp_WinHttpReceiveResponse.whttpReceiveResponse
-Global whttp_WinHttpQueryHeaders.whttpQueryHeaders
-Global whttp_WinHttpQueryDataAvailable.whttpQueryDataAvailable
-Global whttp_WinHttpReadData.whttpReadData
-Global whttp_WinHttpCloseHandle.whttpCloseHandle
-
-Procedure.i C7HttpInit()
-  If hWinHTTP : ProcedureReturn #True : EndIf
-  hWinHTTP = OpenLibrary(#PB_Any, "winhttp.dll")
-  If hWinHTTP = 0 : ProcedureReturn #False : EndIf
-  whttp_WinHttpOpen             = GetFunction(hWinHTTP, "WinHttpOpen")
-  whttp_WinHttpConnect          = GetFunction(hWinHTTP, "WinHttpConnect")
-  whttp_WinHttpOpenRequest      = GetFunction(hWinHTTP, "WinHttpOpenRequest")
-  whttp_WinHttpAddRequestHeaders= GetFunction(hWinHTTP, "WinHttpAddRequestHeaders")
-  whttp_WinHttpSendRequest      = GetFunction(hWinHTTP, "WinHttpSendRequest")
-  whttp_WinHttpReceiveResponse  = GetFunction(hWinHTTP, "WinHttpReceiveResponse")
-  whttp_WinHttpQueryHeaders     = GetFunction(hWinHTTP, "WinHttpQueryHeaders")
-  whttp_WinHttpQueryDataAvailable = GetFunction(hWinHTTP, "WinHttpQueryDataAvailable")
-  whttp_WinHttpReadData         = GetFunction(hWinHTTP, "WinHttpReadData")
-  whttp_WinHttpCloseHandle      = GetFunction(hWinHTTP, "WinHttpCloseHandle")
-  If whttp_WinHttpOpen = 0 Or whttp_WinHttpSendRequest = 0 Or whttp_WinHttpReadData = 0
-    ProcedureReturn #False
-  EndIf
-  ProcedureReturn #True
-EndProcedure
-
-; GET HTTPS avec en-tete Authorization optionnelle.
-; Retourne le corps ; *Status\i recoit le code HTTP (ou -1 en cas d'echec reseau).
-Procedure.s C7HttpGet(Url.s, AuthHeader.s, TimeoutSec.i, *Status.Integer)
-  *Status\i = -1
-  If Not C7HttpInit() : ProcedureReturn "" : EndIf
-
-  Protected Server.s = GetURLPart(Url, #PB_URL_Site)
-  If Server = "" : ProcedureReturn "" : EndIf
-  Protected Port.i = Val(GetURLPart(Url, #PB_URL_Port))
-  If Port = 0 : Port = 443 : EndIf
-  Protected Path.s = GetURLPart(Url, #PB_URL_Path)
-  Protected Params.s = GetURLPart(Url, #PB_URL_Parameters)
-  If Params <> "" : Path + "?" + Params : EndIf
-  If Path = "" : Path = "/" : EndIf
-
-  Protected hSession.i = whttp_WinHttpOpen("MCP-Context7-PureBasic/1.0", 0, 0, 0, 0)
-  If hSession = 0 : ProcedureReturn "" : EndIf
-  Protected hConnect.i = whttp_WinHttpConnect(hSession, Server, Port, 0)
-  If hConnect = 0 : whttp_WinHttpCloseHandle(hSession) : ProcedureReturn "" : EndIf
-  Protected hRequest.i = whttp_WinHttpOpenRequest(hConnect, "GET", Path, 0, 0, 0, #WINHTTP_FLAG_SECURE)
-  If hRequest = 0
-    whttp_WinHttpCloseHandle(hConnect) : whttp_WinHttpCloseHandle(hSession)
-    ProcedureReturn ""
-  EndIf
-
-  ; Timeout (ms) : resolver, connect, send-receive
-  ; (WinHttpSetTimeouts non importe : le delai global reste gere par l'appelant)
-
-  If AuthHeader <> ""
-    If whttp_WinHttpAddRequestHeaders(hRequest, AuthHeader, -1, 0) = 0
-      LogError("WinHttpAddRequestHeaders a echoue")
-    EndIf
-  EndIf
-
-  If whttp_WinHttpSendRequest(hRequest, 0, 0, 0, 0, 0, 0) = 0
-    whttp_WinHttpCloseHandle(hRequest) : whttp_WinHttpCloseHandle(hConnect) : whttp_WinHttpCloseHandle(hSession)
-    ProcedureReturn ""
-  EndIf
-  If whttp_WinHttpReceiveResponse(hRequest, 0) = 0
-    whttp_WinHttpCloseHandle(hRequest) : whttp_WinHttpCloseHandle(hConnect) : whttp_WinHttpCloseHandle(hSession)
-    ProcedureReturn ""
-  EndIf
-
-  ; Code de statut
-  Protected Code.i = 0, CodeLen.i = 4
-  If whttp_WinHttpQueryHeaders(hRequest, #WINHTTP_QUERY_STATUS_CODE | #WINHTTP_QUERY_FLAG_NUMBER, 0, @Code, @CodeLen, 0)
-    *Status\i = Code
-  EndIf
-
-  ; Corps de la reponse
-  Protected *Buf = AllocateMemory(65536)
-  Protected Body.s = "", Avail.i = 0, ReadLow.i = 0
-  If *Buf
-    While whttp_WinHttpQueryDataAvailable(hRequest, @Avail)
-      If Avail <= 0 : Break : EndIf
-      If Avail > 65536 : Avail = 65536 : EndIf
-      ReadLow = 0
-      If whttp_WinHttpReadData(hRequest, *Buf, Avail, @ReadLow) = 0 Or ReadLow <= 0
-        Break
-      EndIf
-      Body + PeekS(*Buf, ReadLow, #PB_UTF8 | #PB_ByteLength)
-    Wend
-    FreeMemory(*Buf)
-  EndIf
-
-  whttp_WinHttpCloseHandle(hRequest)
-  whttp_WinHttpCloseHandle(hConnect)
-  whttp_WinHttpCloseHandle(hSession)
-  ProcedureReturn Body
-EndProcedure
-
-CompilerElse
-
-; Fallback Linux/macOS : HTTP integre PureBasic (pas d'en-tete Authorization
-; possible -> l'appel avec cle est rejete proprement, voir ToolQueryDocs).
-Procedure.s C7HttpGet(Url.s, AuthHeader.s, TimeoutSec.i, *Status.Integer)
-  If AuthHeader <> ""
-    *Status\i = -2   ; marqueur : en-tetes non supportes sur cet OS
-    ProcedureReturn ""
-  EndIf
-  HTTPTimeout(TimeoutSec * 1000)
-  Protected Req.i = HTTPRequestMemory(#PB_HTTP_Get, Url)
-  If Not Req
-    *Status\i = -1
-    ProcedureReturn ""
-  EndIf
-  *Status\i = Val(HTTPInfo(Req, #PB_HTTP_StatusCode))
-  Protected Result.s = ""
-  Protected *Buf = HTTPMemory(Req)
-  If *Buf
-    Protected Size.i = MemorySize(*Buf)
-    If Size > 0
-      Result = PeekS(*Buf, Size, #PB_UTF8 | #PB_ByteLength)
-    EndIf
-  EndIf
-  FinishHTTP(Req)
-  ProcedureReturn Result
-EndProcedure
-
-CompilerEndIf
-
-; ---------------------------------------------------------------------------
 ; Mapping des erreurs HTTP en message MCP
 ; ---------------------------------------------------------------------------
 Procedure.s C7HttpErrorText(Status.i, Prefix.s)
@@ -224,7 +53,7 @@ Procedure.s ToolResolveLibraryId(Query.s, LibraryType.s)
 
   Protected Url.s = "https://context7.com/api/v1/search?query=" + UrlEncodeComponent(Query) + "&libraryType=" + UrlEncodeComponent(LibraryType)
   Protected Status.i
-  Protected Body.s = C7HttpGet(Url, "", 15, @Status)
+  Protected Body.s = HttpGetHeaders(Url, "", 15, @Status)
   If Status <> 200
     Protected Err.s = C7HttpErrorText(Status, "Erreur recherche")
     If Err <> "" : ProcedureReturn Err : EndIf
@@ -290,7 +119,7 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
   EndIf
 
   Protected Status.i
-  Protected Body.s = C7HttpGet(Url, Auth, 20, @Status)
+  Protected Body.s = HttpGetHeaders(Url, Auth, 20, @Status)
   If Status <> 200
     Protected Err.s = C7HttpErrorText(Status, "Erreur docs")
     If Err <> "" : ProcedureReturn Err : EndIf

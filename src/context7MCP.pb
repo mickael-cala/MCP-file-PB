@@ -13,6 +13,7 @@ EnableExplicit
 IncludeFile "../mcp_common/stdio.pbi"
 IncludeFile "../mcp_common/logging.pbi"
 IncludeFile "../mcp_common/json_helpers.pbi"
+IncludeFile "../mcp_common/http.pbi"
 IncludeFile "../mcp_common/protocol.pbi"
 IncludeFile "../mcp_common/jsonrpc.pbi"
 

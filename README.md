@@ -11,6 +11,7 @@ Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) �
 | **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) + PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`) |
 | **context7MCP** | `src/context7MCP.pb` + `src/context7_core.pbi` | 2 outils | Résolution de bibliothèques et documentation via l'API [Context7](https://context7.com) |
 | **gitMCP** | `src/gitMCP.pb` + `src/git_core.pbi` | 7 outils | Exploration de dépôts git locaux (status, log, diff, show, branches, blame) |
+| **githubMCP** | `src/githubMCP.pb` + `src/github_core.pbi` | 10 outils | API REST GitHub : repos, issues, pull requests, commits, recherches |
 
 Caractéristiques communes :
 
@@ -100,6 +101,23 @@ HTTP : couche WinHTTP native sous Windows (en-têtes `Authorization` supportées
 
 Sécurité : tous les paramètres (chemins, refs) sont validés avant exécution — les métacaractères shell (`;` `&` `|` `<` `>` `` ` `` `$` `(` `)` guillemets, retours ligne) sont rejetés. `MCP_GIT_EXE` permet de pointer un `git.exe` hors PATH ; le serveur refuse de démarrer si git est introuvable.
 
+### githubMCP — API REST GitHub
+
+| Outil | Description | Paramètres |
+|---|---|---|
+| `gh_get_repo` | Métadonnées d'un dépôt | `owner`, `repo` |
+| `gh_list_issues` | Liste paginée des issues | `owner`, `repo`, `state`, `page`, `per_page` |
+| `gh_get_issue` | Détail d'une issue | `owner`, `repo`, `number` |
+| `gh_create_issue` | Crée une issue — **`confirm=true` requis** | `owner`, `repo`, `title`, `body`, `confirm` |
+| `gh_list_pull_requests` | Liste paginée des PR | `owner`, `repo`, `state`, `page`, `per_page` |
+| `gh_get_pull_request` | Détail d'une PR | `owner`, `repo`, `number` |
+| `gh_create_pull_request` | Crée une PR — **`confirm=true` requis** | `owner`, `repo`, `title`, `head`, `base`, `body`, `confirm` |
+| `gh_list_commits` | Commits paginés (filtre `sha`) | `owner`, `repo`, `sha`, `page`, `per_page` |
+| `gh_search_code` | Recherche de code | `query`, `page`, `per_page` |
+| `gh_search_repositories` | Recherche de dépôts | `query`, `page`, `per_page` |
+
+Sécurité : token jamais renvoyé dans les messages ; écritures refusées sans `confirm=true` ; pagination bornée (`per_page` max 100) ; erreurs mappées (401 token, 403 quota, 404 introuvable, 422 validation, 5xx). Les tests d'intégration utilisent un **serveur GitHub mock local** (`tests/mock_github.py`), sans réseau.
+
 ⚠️ **Attention** : `write_file`, `delete_file`, `move_file` et `change_root` sont des opérations destructrices ou sensibles. Ne connectez ce serveur qu'à un répertoire dont la perte de contenu serait acceptable.
 
 ## Sécurité
@@ -114,6 +132,8 @@ Sécurité : tous les paramètres (chemins, refs) sont validés avant exécution
 | `MCP_DB_ALLOW_WRITE` | `1` = autorise les requêtes d'écriture (INSERT/UPDATE/DELETE/DDL). Défaut : lecture seule. | dbMCP |
 | `MCP_CONTEXT7_API_KEY` | Clé API Context7 (préfixe `ctx7sk`, https://context7.com). Requise par `query_docs` ; `resolve_library_id` fonctionne sans. | context7MCP |
 | `MCP_GIT_EXE` | Chemin de l'exécutable git si absent du PATH. | gitMCP |
+| `MCP_GITHUB_TOKEN` | Token GitHub (PAT). Requis par tous les outils githubMCP. | githubMCP |
+| `MCP_GITHUB_API_BASE` | Base de l'API (défaut `https://api.github.com`) ; sert aux tests avec un mock. | githubMCP |
 
 Tous les chemins passés aux outils fileMCP sont normalisés et bloqués s'ils tentent de sortir de la racine autorisée. Voir [SECURITY.md](SECURITY.md).
 
@@ -128,7 +148,7 @@ build.bat      # Windows   -> genere build\fileMCP.exe, build\MCP-Fetch-PB.exe, 
 ./build.sh     # Linux/macOS -> memes noms sans extension
 ```
 
-Les scripts compilent les 7 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
+Les scripts compilent les 8 serveurs. Le compilateur est cherché dans la variable d'environnement `PBCOMPILER`, puis dans les chemins par défaut (`C:\Program Files\PureBasic\Compilers`, `C:\PureBasic\Compilers`), puis dans le `PATH`. Les exécutables sont générés dans `build/` (non versionné).
 
 Pour nettoyer : `clean.bat` / `./clean.sh`.
 
@@ -162,11 +182,11 @@ run_all.bat        # ou ./run_all.sh : tout verifier
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
-python tests/test_mcp.py                          # les 7 serveurs
+python tests/test_mcp.py                          # les 8 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-75 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
+100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne). Le binaire de chaque serveur est cherché dans `build/`, puis `src/` ; la variable `<NOM>_BIN` (ex. `FILEMCP_BIN`, `MEMORYMCP_BIN`) force un chemin.
 
 ## Configuration d'un client MCP
 
@@ -202,6 +222,12 @@ Exemple générique (les trois serveurs) :
     },
     "git-pb": {
       "command": "/chemin/vers/build/gitMCP"
+    },
+    "github-pb": {
+      "command": "/chemin/vers/build/githubMCP",
+      "env": {
+        "MCP_GITHUB_TOKEN": "ghp_..."
+      }
     }
   }
 }
@@ -233,14 +259,16 @@ src/
 ├── context7_core.pbi             # Coeur metier Context7 (WinHTTP/Linux)
 ├── gitMCP.pb                     # Serveur Git (main)
 ├── git_core.pbi                  # Coeur metier Git (sous-processus git)
+├── githubMCP.pb                  # Serveur GitHub (main)
+├── github_core.pbi               # Coeur metier GitHub (API REST)
 
 examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
-build.bat / build.sh        # Compilation des 7 serveurs (sortie dans build/)
+build.bat / build.sh        # Compilation des 8 serveurs (sortie dans build/)
 clean.bat / clean.sh        # Suppression des artefacts de compilation
 run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapport
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
-├── test_mcp.py             # Tests fonctionnels des 7 serveurs (75 tests)
+├── test_mcp.py             # Tests fonctionnels des 8 serveurs (100 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
 └── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)

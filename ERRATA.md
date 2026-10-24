@@ -28,7 +28,8 @@
 
 ## Résultats des tests
 
-Dernière exécution de `run_all.bat` : **8/8 étapes** — tests unitaires
-24 + 33 + 37 + 19 + 24 réussis (mcp_common, Memory, Database, Context7,
-Git), tests d'intégration **75/75** (7 serveurs ; PostgreSQL et Context7
-live sont ignorés sans configuration/réseau).
+Dernière exécution de `run_all.bat` : **9/9 étapes** — tests unitaires
+24 + 33 + 37 + 19 + 24 + 40 réussis (mcp_common, Memory, Database, Context7,
+Git, GitHub), tests d'intégration **100/100** (8 serveurs ; PostgreSQL et
+Context7 live sont ignorés sans configuration/réseau, GitHub utilise un mock
+local).
