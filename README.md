@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/mickael-cala/MCP-file-PB)](https://github.com/mickael-cala/MCP-file-PB/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Trois serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) écrits en **PureBasic**, 100 % natifs, qui exposent des outils à un client IA (Claude Desktop, Kimi Code, etc.) via **JSON-RPC 2.0 sur stdin/stdout** :
+Huit serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) écrits en **PureBasic**, 100 % natifs, qui exposent des outils à un client IA (Claude Desktop, Kimi Code, etc.) via **JSON-RPC 2.0 sur stdin/stdout** :
 
 | Serveur | Source | Outil(s) | Description |
 |---|---|---|---|
