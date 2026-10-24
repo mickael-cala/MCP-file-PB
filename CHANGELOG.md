@@ -4,6 +4,17 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Documentation
+- **`PLAN.md`** : suivi des phases 0-6 (statut, livrables, définition de
+  « terminé », tests par phase).
+- `ROADMAP.md` réécrite (phases 0-5 terminées, reliquats par serveur).
+- `CONTRIBUTING.md` : architecture `mcp_common/`, workflow `run_all`,
+  conventions d'outils et de sécurité.
+- `SECURITY.md` : tableau des surfaces/protections des 8 serveurs, secrets
+  et recommandations de déploiement.
+- Compteurs de tests actualisés (177 unitaires, 100 intégration) dans README,
+  ERRATA, AGENTS, modèles d'issues/PR.
+
 ### Ajouté (Phase 5 — GitHub)
 - **`githubMCP`** : serveur MCP de l'API REST GitHub (`src/githubMCP.pb` +
   `src/github_core.pbi`) — 10 outils : `gh_get_repo`, `gh_list_issues`,

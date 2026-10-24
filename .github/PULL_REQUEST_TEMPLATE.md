@@ -5,8 +5,8 @@
 ## Vérifications effectuées
 
 - [ ] Compilation : `build.bat` / `./build.sh` OK
-- [ ] Tests : `python tests/test_mcp.py` → 26/26 (ou justifié)
-- [ ] Nouvel outil MCP éventuel : ajouté au catalogue, au dispatch, confiné par `ValiderChemin()`, testé
+- [ ] Tests : `run_all.bat` / `./run_all.sh` → 9/9 étapes (100 tests d'intégration)
+- [ ] Nouvel outil MCP éventuel : ajouté au catalogue, au dispatch, entrées assainies, testé
 - [ ] Messages d'échec détectés comme erreurs (`Erreur` / `Impossible` / `Echec` / `introuvable` / `refusee` / `depasse`)
 
 ## Sécurité

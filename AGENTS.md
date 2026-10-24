@@ -95,5 +95,5 @@ tests/test_context7.pb            tests unitaires Context7 (19 tests)
 tests/test_git.pb                 tests unitaires Git (24 tests)
 ```
 
-Voir aussi : [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md),
+Voir aussi : [README.md](README.md), [PLAN.md](PLAN.md), [CONTRIBUTING.md](CONTRIBUTING.md),
 [ROADMAP.md](ROADMAP.md), [ERRATA.md](ERRATA.md), [SECURITY.md](SECURITY.md).

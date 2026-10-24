@@ -9,34 +9,46 @@ Ouvrez plutôt un avis de sécurité privé via
 (contact : `mickael-cala`). Vous recevrez une réponse sous quelques jours ;
 une correction sera publiée avant toute divulgation publique.
 
-## Modèle de sécurité du serveur
+## Modèle de sécurité
 
-Le serveur est conçu comme un **outil puissant volontairement confiné** :
+Le dépôt contient 8 serveurs MCP, chacun avec ses garde-fous :
 
-- Toutes les opérations sont limitées à la racine `MCP_ROOT` (ou le répertoire
-  courant si la variable est absente). Les chemins sont normalisés et les
-  tentatives de sortie (`..`, chemins absolus hors racine) sont refusées.
-- `change_root` exige le secret `MCP_ROOT_SECRET` ; s'il n'est pas configuré,
-  la modification de racine est impossible.
-- Les outils `write_file`, `delete_file`, `move_file` et `change_root` sont
-  **destructeurs ou sensibles** : ne branchez ce serveur que sur un
-  répertoire dont la perte de contenu serait acceptable, et ne l'exposez
-  jamais à un réseau (transport stdio local uniquement).
-- Le serveur n'a aucune authentification client : la sécurité repose entièrement
-  sur le confinement du processus et de son environnement.
+| Serveur | Surface | Protections |
+|---|---|---|
+| `fileMCP` | Système de fichiers | Confinement à `MCP_ROOT`, normalisation des chemins (traversées `..` refusées), `change_root` protégé par `MCP_ROOT_SECRET` |
+| `memoryMCP` | Base SQLite | Échappement SQL (apostrophes doublées), FK en cascade, base locale (`MCP_MEMORY_DB`) |
+| `dbMCP` | Bases SQL | **Lecture seule par défaut** (`IsReadOnlyQuery`), écritures uniquement avec `MCP_DB_ALLOW_WRITE=1`, refus journalisés |
+| `context7MCP` | API web | HTTP/HTTPS uniquement, clé API jamais loggée |
+| `gitMCP` | Sous-processus git | `GitSafeParam` rejette les métacaractères shell sur tous les paramètres, aucune commande exécutée sans validation |
+| `githubMCP` | API GitHub | Écritures exigeant `confirm=true`, token jamais renvoyé ni loggé, pagination bornée, validation des segments d'URL |
+| `MCP-Fetch-PB` | API web | HTTP/HTTPS uniquement, hôtes privés/loopback refusés (anti-SSRF) |
+| `MCP-SequentialThinking-PB` | État local | Aucune I/O externe |
 
-## Recommandations de déploiement
+## Secrets et variables d'environnement
 
-- Définissez toujours `MCP_ROOT` explicitement (ne reposez pas sur le
-  répertoire courant).
-- Définissez `MCP_ROOT_SECRET` avec un mot de passe fort si vous prévoyez
-  d'utiliser `change_root`.
-- Lancez le serveur avec les privilèges minimaux (utilisateur dédié si
-  possible).
-- Gardez le binaire à jour ; consultez les [errata](ERRATA.md) connus.
+| Variable | Sensibilité | Recommandation |
+|---|---|---|
+| `MCP_ROOT_SECRET` | Mot de passe | Valeur forte, non réutilisée |
+| `MCP_GITHUB_TOKEN` | Token PAT | Scope minimal (lecture seule si possible), rotation régulière |
+| `MCP_CONTEXT7_API_KEY` | Clé API | Prefixe `ctx7sk`, rotation si fuite |
+| `MCP_DB_POSTGRES_DSN` | Peut contenir un mot de passe | Préférer un utilisateur dédié en lecture seule |
+
+Règles générales :
+
+- Les serveurs ne renvoient **jamais** un secret dans une réponse MCP ; les
+  logs vont sur **stderr** (jamais stdout, qui porte le protocole).
+- Ne lancez les serveurs qu'en local : le transport est stdio, sans
+  authentification client. La sécurité repose sur le processus, son
+  environnement et les droits de l'utilisateur.
+- Ne connectez `fileMCP` qu'à un répertoire dont la perte de contenu serait
+  acceptable (outils destructeurs : `write_file`, `delete_file`, `move_file`,
+  `change_root`).
+- `dbMCP` en écriture (`MCP_DB_ALLOW_WRITE=1`) doit pointer une base de test
+  ou un utilisateur SQL aux droits limités.
 
 ## Sécurité du code
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) : toute modification touchant à
-`ValiderChemin()` ou à la couche E/S stdio exige une revue attentive et des
-tests de sécurité (`tests/test_mcp.py` contient des cas de traversée).
+Voir [CONTRIBUTING.md](CONTRIBUTING.md). Les cas de sécurité sont couverts par
+les tests : traversées de chemins (fileMCP), injection SQL (memory/db),
+injection shell (git), garde `confirm` et gestion d'erreurs (github),
+anti-SSRF (fetch), refus d'écriture SQL (db).

@@ -178,7 +178,7 @@ run_all.bat        # ou ./run_all.sh : tout verifier
   `tests/test_memory.pb` (33 tests sur le serveur Memory). Chaque futur module
   ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
-  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (56 tests qui
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (100 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
@@ -278,6 +278,7 @@ Nouveau serveur ? Incluez `mcp_common/` (voir `examples/minimal_server.pb`), ren
 
 ## Documentation
 
+- [PLAN.md](PLAN.md) — suivi des phases du plan (état, livrables)
 - [CHANGELOG.md](CHANGELOG.md) — journal des versions
 - [ROADMAP.md](ROADMAP.md) — feuille de route
 - [ERRATA.md](ERRATA.md) — limitations et problèmes connus
