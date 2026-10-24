@@ -4,6 +4,17 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Corrigé (conformité PureBasic)
+- **Suppression de `src/fileMCP_{Windows,Linux,macOS}.pbi`** : ces fichiers
+  n'étaient pas conformes — en PureBasic, `.pbi` est l'extension des fichiers
+  d'inclusion, un projet IDE est un `.pbp` ; leur contenu (sections `[PROJECT]`
+  / `[X]` / `[FILE]` avec clés inventées, commentaires `;` dans les valeurs,
+  chemins de sortie obsolètes) n'était pas vérifiable et ne couvrait qu'un
+  serveur. Le workflow IDE est désormais documenté dans le README (ouvrir le
+  `.pb`, format Console) et reste couvert par `build.bat`/`build.sh`.
+  Les `.pbi` restants (`mcp_common/*`, `tests/unit_test.pbi`) sont de vrais
+  modules d'inclusion, compilés et validés par les tests.
+
 ### Ajouté (Phase 4 — Git)
 - **`gitMCP`** : serveur MCP d'exploration de dépôts git locaux
   (`src/gitMCP.pb` + `src/git_core.pbi`) — 7 outils : `git_is_repo`,

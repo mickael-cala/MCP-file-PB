@@ -80,17 +80,17 @@ src/memoryMCP.pb + memory_core.pbi  memoire SQLite
 src/dbMCP.pb + db_core.pbi        exploration SQL (sqlite + postgres)
 src/context7MCP.pb + context7_core.pbi  documentation Context7
 src/gitMCP.pb + git_core.pbi      exploration git locale
-src/*.pbi                         fichiers projet IDE PureBasic (fileMCP)
 examples/minimal_server.pb        serveur MCP minimal de demo
 build.bat/build.sh                compilation des 7 serveurs ; clean.* : nettoyage
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
-tests/test_mcp.py                 tests d'integration des 5 serveurs (56 tests)
-tests/test_database.pb           tests unitaires Database (37 tests)
-tests/test_context7.pb           tests unitaires Context7 (19 tests)
-tests/test_git.pb                tests unitaires Git (24 tests)
-tests/unit_test.pbi + test_common.pb  framework + tests unitaires (24 tests)
+tests/test_mcp.py                 tests d'integration des 7 serveurs (75 tests)
+tests/unit_test.pbi               framework de tests unitaires PureBasic
+tests/test_common.pb              tests unitaires mcp_common (24 tests)
 tests/test_memory.pb              tests unitaires Memory (33 tests)
+tests/test_database.pb            tests unitaires Database (37 tests)
+tests/test_context7.pb            tests unitaires Context7 (19 tests)
+tests/test_git.pb                 tests unitaires Git (24 tests)
 ```
 
 Voir aussi : [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md),

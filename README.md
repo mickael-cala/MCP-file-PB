@@ -134,7 +134,13 @@ Pour nettoyer : `clean.bat` / `./clean.sh`.
 
 ### Via l'IDE PureBasic
 
-Pour fileMCP, ouvrez le fichier projet de votre plateforme (`src/fileMCP_Windows.pbi`, `src/fileMCP_Linux.pbi`, `src/fileMCP_macOS.pbi`) et compilez (`F5`). Pour les autres serveurs, ouvrez directement le `.pb` dans l'IDE et compilez en format Console.
+Ouvrez le `.pb` du serveur voulu (ex. `src/fileMCP.pb`), puis :
+
+1. **Options du compilateur** → Format d'exécutable : **Console**
+2. Nom de l'exécutable : `build/<nom>.exe` (ou ce que vous préférez)
+3. **Compilation → Compiler** (`F5`)
+
+Aucun fichier `.pbp` n'est fourni : les scripts `build.bat`/`build.sh` couvrent la compilation reproductible (mêmes options), et l'IDE fait foi pour les options. Les fichiers `.pbi` du dépôt sont uniquement les **modules d'inclusion** (`mcp_common/`, `tests/unit_test.pbi`), pas des projets.
 
 Les exécutables compilés ne sont pas versionnés : publiez-les via [GitHub Releases](https://docs.github.com/fr/repositories/releasing-projects-on-github) si besoin.
 
@@ -227,9 +233,6 @@ src/
 ├── context7_core.pbi             # Coeur metier Context7 (WinHTTP/Linux)
 ├── gitMCP.pb                     # Serveur Git (main)
 ├── git_core.pbi                  # Coeur metier Git (sous-processus git)
-├── fileMCP_Windows.pbi           # Projet IDE PureBasic — Windows
-├── fileMCP_Linux.pbi             # Projet IDE PureBasic — Linux
-└── fileMCP_macOS.pbi             # Projet IDE PureBasic — macOS
 
 examples/minimal_server.pb  # Serveur MCP minimal de demo (validation Phase 0)
 build.bat / build.sh        # Compilation des 7 serveurs (sortie dans build/)
