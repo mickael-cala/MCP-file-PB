@@ -2,7 +2,7 @@
 
 Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [1.0.1] - 2026-10-26
 
 ### Corrigé (sécurité et conformité — suite à audit, Phase 7)
 

@@ -23,7 +23,7 @@
 | Erreurs MCP en `isError: true` avec message clair | ✅ état explicite `ToolOk`/`ToolFail` + heuristique de premier recours limitée à la première ligne |
 | Aucun secret loggé ni renvoyé | ✅ tokens/clés jamais inclus dans les réponses ; logs stderr |
 | Documentation README complète | ✅ (outils, env, build, tests, config client) |
-| Release publiée | ✅ v1.0.0 (tag + binaires Windows + SHA256SUMS) |
+| Release publiée | ✅ v1.0.0 puis v1.0.1 (tags + binaires Windows/Linux + SHA256SUMS) |
 | Validation Linux | ✅ WSL2 Ubuntu 26.04 (compilation 8 serveurs + 10/10) |
 | Validation macOS | ⏳ à faire (prérequis : `curl`) |
 | Robustesse (T6.1–T6.8) | ✅ 17/17 vérifications (charge 10k via `MCP_STRESS_REQUESTS`) |

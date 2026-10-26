@@ -21,7 +21,7 @@ IncludeFile "git_core.pbi"
 ; Programme principal
 ; ---------------------------------------------------------------------------
 G_ServerName = "GitMCPServer-PureBasic"
-G_ServerVersion = "1.0.0"
+G_ServerVersion = "1.0.1"
 
 If Not CheckStdio()
   End 1

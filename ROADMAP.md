@@ -7,9 +7,9 @@ conformité JSON-RPC) est appliqué. Cette feuille de route couvre la suite.
 
 ## Court terme
 
-- **Valider macOS** (le code et `build.sh` sont prêts ; prérequis : `curl`),
-  puis publier les binaires **Linux** et **macOS** dans une release `v1.0.1`
-  avec `SHA256SUMS`.
+- **Valider macOS** (le code et `build.sh` sont prêts ; prérequis : `curl`)
+  et publier les binaires **macOS** dans une release ultérieure avec
+  `SHA256SUMS` (les binaires Linux sont livrés depuis la `v1.0.1`).
 - Ajouter une **CI GitHub Actions** (matrice Windows/Linux) si un runner avec
   PureBasic sous licence devient disponible.
 

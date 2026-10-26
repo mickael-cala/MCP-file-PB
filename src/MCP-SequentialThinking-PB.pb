@@ -154,7 +154,7 @@ EndProcedure
 ; Programme principal
 ; ---------------------------------------------------------------------------
 G_ServerName = "SequentialThinkingMCPServer-PureBasic"
-G_ServerVersion = "1.0.0"
+G_ServerVersion = "1.0.1"
 *G_ToolHandler = @ToolDispatch()
 *G_CatalogBuilder = @BuildToolsCatalog()
 
