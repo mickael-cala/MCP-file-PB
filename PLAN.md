@@ -1,6 +1,6 @@
 # Suivi du plan de développement
 
-État des phases du plan (mise à jour : 2026-10-24).
+État des phases du plan (mise à jour : 2026-10-26, après la Phase 7).
 
 | Phase | Sujet | Statut | Livrables |
 |---|---|---|---|

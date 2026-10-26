@@ -1,7 +1,9 @@
 # Feuille de route
 
-Les 8 serveurs MCP (phases 0 à 6, voir [PLAN.md](PLAN.md)) sont livrés et la
-**v1.0.0** est publiée. Cette feuille de route couvre la suite.
+Les 8 serveurs MCP (phases 0 à 7, voir [PLAN.md](PLAN.md)) sont livrés, la
+**v1.0.0** est publiée et le durcissement sécurité/conformité (Phase 7 :
+anti-SSRF par résolution DNS, redirections bornées, `isError` explicite,
+conformité JSON-RPC) est appliqué. Cette feuille de route couvre la suite.
 
 ## Court terme
 
@@ -15,8 +17,8 @@ Les 8 serveurs MCP (phases 0 à 6, voir [PLAN.md](PLAN.md)) sont livrés et la
 
 - **Fetch/SequentialThinking** : extraction HTML→Markdown plus riche (tableaux,
   code), persistance optionnelle de l'historique de raisonnement.
-- **FileMCP** : `copy_file`, suppression récursive optionnelle, pagination de
-  `list_files`/`search_files`, lecture binaire base64.
+- **FileMCP** : `copy_file`, pagination de `list_files`/`search_files`,
+  lecture binaire base64 (la suppression récursive est livrée : `recursive=true`).
 - **Memory** : recherche plein texte (FTS5), export/import JSON du graphe.
 - **Database** : PostgreSQL avec binding de paramètres, `db_explain` formaté.
 - **Git** : `git_log` avec plage de dates, `git_diff --stat`, `--no-color`.

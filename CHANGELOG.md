@@ -4,7 +4,7 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
-### Corrigé (sécurité et conformité — suite à audit)
+### Corrigé (sécurité et conformité — suite à audit, Phase 7)
 
 - **Anti-SSRF (`mcp_common/net_guard.pbi`, `src/MCP-Fetch-PB.pb`)** :
   l'hôte est résolu (`getaddrinfo`) et **toutes** ses adresses doivent être

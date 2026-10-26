@@ -145,27 +145,31 @@ Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
    (résolution de **toutes** les adresses) ; les redirections sont suivies
    manuellement, bornées et revalidées.
 6. Commentaires et messages d'erreur en **français**, style du fichier.
-5. Aucune duplication de code stdio/JSON-RPC/HTTP dans un serveur : tout va
+7. Aucune duplication de code stdio/JSON-RPC/HTTP dans un serveur : tout va
    dans `mcp_common/`.
-6. Tout nouvel outil MCP doit :
+8. Tout nouvel outil MCP doit :
    - être ajouté au catalogue (`BuildToolsCatalog` / `XxxBuildCatalog`) ;
    - avoir son `Case` dans le dispatch ;
    - assainir ses entrées (chemins, refs, segments d'URL) avant usage ;
-   - commencer ses messages d'échec par `Erreur` / `ERREUR` / `Impossible` /
-     `Echec` ou contenir `introuvable` / `refusee` / `depasse` pour que
-     `isError` soit positionné (heuristique `DetectIsError`) ;
+   - retourner ses **erreurs** via `ToolFail(...)` et ses **payloads** via
+     `ToolOk(...)` (l'heuristique `DetectIsError` n'est qu'un filet) ;
    - être couvert par un test unitaire (`tests/test_<serveur>.pb`) et/ou
      d'intégration (`tests/test_mcp.py`).
-7. Protections obligatoires : confinement `MCP_ROOT` (fileMCP), écritures SQL
+9. Protections obligatoires : confinement `MCP_ROOT` (fileMCP), écritures SQL
    derrière `MCP_DB_ALLOW_WRITE`, écritures GitHub derrière `confirm=true`,
-   validation anti-injection (`GitSafeParam`, `GhSafeSegment`).
-8. Ne jamais élargir le périmètre de sécurité sans demande explicite.
-9. Les exécutables vont dans `build/` (gitignoré) — jamais de binaire commité.
+   validation anti-injection (`GitSafeParam`, `GhSafeSegment`), validation
+   réseau `NetGuardValidateUrl()` (fetch).
+10. Ne jamais élargir le périmètre de sécurité sans demande explicite.
+11. Les exécutables vont dans `build/` (gitignoré) — jamais de binaire commité.
 
 ## Pièges PureBasic rencontrés (ne pas les réintroduire)
 
-- **Mots réservés** : `Args`, `To`, `Result` ne peuvent pas être des noms de
-  variables/paramètres. Renommer (`GitArgs`, `Dest`, `R`).
+- **Mots réservés** : `Args`, `To`, `Result`, `Read` ne peuvent pas être des
+  noms de variables/paramètres. Renommer (`GitArgs`, `Dest`, `R`, `BytesRead`).
+- **`ReadString()` s'arrête à la fin de ligne** : même avec une longueur
+  explicite (`ReadString(f, #PB_UTF8, Lof(f))`), il faut **plusieurs** lignes ?
+  Non : une seule ligne est lue. Pour lire un fichier entier, passer par
+  `ReadData` + `PeekS` (voir `HttpReadWholeFile()` dans `http.pbi`).
 - **Paramètres structure** : passage **par pointeur uniquement** —
   `Procedure Foo(*P.MaStructure)` + appel `Foo(@MaVar)`. `Procedure Foo(P.MaStructure)`
   est une erreur de syntaxe.
@@ -201,8 +205,10 @@ Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
 
 - Requête : `{"jsonrpc":"2.0","id":N,"method":"tools/call","params":{"name":"...","arguments":{...}}}`
 - Réponse outil : `result.content[0].text` + `result.isError`.
-- `tools/list` retourne le catalogue ; `notifications/initialized` est ignoré ;
-  EOF sur stdin = arrêt propre du serveur.
+- `tools/list` retourne le catalogue ; **toute notification (requête sans
+  `id`) est ignorée sans réponse** ; EOF sur stdin = arrêt propre du serveur.
+- Codes d'erreur normalisés : `-32601` méthode inconnue, `-32602` paramètres
+  invalides (`tools/call` sans nom d'outil).
 - Variables d'environnement par serveur : voir README et SECURITY.md.
 
 ## Structure

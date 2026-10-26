@@ -43,7 +43,8 @@
 
 ## Résultats des tests
 
-Dernière exécution de `run_all.bat` : **10/10 étapes** — tests unitaires
+Dernière exécution de `run_all.bat` (Windows) et `./run_all.sh`
+(WSL2 Ubuntu 26.04, PureBasic 6.41 Linux x64) : **10/10 étapes** — tests unitaires
 42 + 33 + 37 + 19 + 24 + 40 réussis (mcp_common, Memory, Database, Context7,
 Git, GitHub), robustesse/performance **17/17**, tests d'intégration
 **121/121** (8 serveurs ; PostgreSQL et Context7 live sont ignorés sans
