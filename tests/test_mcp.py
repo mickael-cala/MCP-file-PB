@@ -21,11 +21,16 @@ Usage :
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 from pathlib import Path
 
-from mcp_client import MCPTestClient
+# Portabilite : fonctionne aussi avec un interpreteur isole (python -P), ou le
+# repertoire du script n'est pas ajoute a sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from mcp_client import MCPError, MCPTestClient
 
 ROOT_SECRET = "test-secret-123"
 
@@ -128,6 +133,56 @@ def run_checks_filemcp(client, root):
     err, text = client.tool_text("read_file", {"path": "rename.txt"})
     check("fichier supprime illisible", err, text)
 
+    print("\n== fileMCP : delete_file non recursif par defaut ==")
+    client.tool_text("write_file", {"path": "dossier/keep.txt", "content": "x"})
+    err, text = client.tool_text("delete_file", {"path": "dossier"})
+    check("dossier non vide refuse par defaut", err and "recursive" in text, text[:160])
+    check("dossier non vide conserve", (root / "dossier" / "keep.txt").exists())
+    err, text = client.tool_text("delete_file", {"path": "dossier", "recursive": True})
+    check("delete_file recursive accepte", not err, text[:160])
+    check("dossier supprime (recursif)", not (root / "dossier").exists())
+
+    client.tool_text("create_directory", {"path": "vide"})
+    err, text = client.tool_text("delete_file", {"path": "vide"})
+    check("dossier vide supprime par defaut", not err and not (root / "vide").exists(), text[:160])
+
+    print("\n== fileMCP : refus des fichiers binaires ==")
+    (root / "fake.exe").write_bytes(b"MZ\x00\x00\x00")
+    err, text = client.tool_text("read_file", {"path": "fake.exe"})
+    check("read_file refuse .exe", err and "binaire" in text.lower(), text[:160])
+    err, text = client.tool_text("read_file_lines", {"path": "fake.exe"})
+    check("read_file_lines refuse .exe", err and "binaire" in text.lower(), text[:160])
+    (root / "sansextension").write_text("contenu texte lisible\n", encoding="utf-8")
+    err, text = client.tool_text("read_file", {"path": "sansextension"})
+    check("fichier texte sans extension lisible", not err and "lisible" in text, text[:160])
+
+    print("\n== fileMCP : isError pilote par l'outil ==")
+    (root / "mots.txt").write_text("le mot introuvable figure ici\n", encoding="utf-8")
+    err, text = client.tool_text("search_files", {"path": ".", "pattern": "introuvable"})
+    check("search_files reussi -> isError false", not err and "introuvable" in text, text[:160])
+    (root / "erreur.txt").write_text("Erreur : ceci est un fichier valide\n", encoding="utf-8")
+    err, text = client.tool_text("read_file", {"path": "erreur.txt"})
+    check("contenu commencant par 'Erreur' -> isError false", not err, text[:160])
+    err, text = client.tool_text("read_file", {"path": "../hors-racine.txt"})
+    check("echec reel -> isError true", err, text[:160])
+
+    print("\n== Protocole JSON-RPC ==")
+    client.send_notification("notifications/cancelled", {"requestId": 1})
+    try:
+        resp = client.request("tools/list")
+        silence_ok = resp.get("id") == client.next_id
+        detail = resp
+    except MCPError as exc:
+        silence_ok = False
+        detail = str(exc)
+    check("notification sans id -> aucune reponse", silence_ok, str(detail)[:160])
+
+    resp = client.request("resources/list")
+    check("methode inconnue -> -32601", (resp.get("error") or {}).get("code") == -32601, resp)
+
+    resp = client.request("tools/call", {"arguments": {}})
+    check("tools/call sans name -> -32602", (resp.get("error") or {}).get("code") == -32602, resp)
+
 
 # ---------------------------------------------------------------------------
 # Suite MCP-SequentialThinking-PB
@@ -178,6 +233,22 @@ def run_tests_fetch():
 
         err, text = client.tool_text("fetch", {"url": "not-a-url"})
         check("URL invalide signalee en erreur", err, text[:120])
+
+        print("\n== Fetch : garde anti-SSRF (IP resolue) ==")
+        for url in ("http://127.1:9/", "http://2130706433:9/", "http://0.0.0.0:9/", "http://[::1]:9/"):
+            err, text = client.tool_text("fetch", {"url": url, "max_length": 100})
+            check(f"refus prive: {url}", err and "prive" in text, text[:120])
+
+        try:
+            socket.gethostbyname("localtest.me")
+            dns_ok = True
+        except Exception:
+            dns_ok = False
+        if dns_ok:
+            err, text = client.tool_text("fetch", {"url": "http://localtest.me:9/", "max_length": 100})
+            check("refus d'un nom DNS resolvant vers loopback", err and "prive" in text, text[:120])
+        else:
+            print("  [SKIP] DNS indisponible : nom resolu vers loopback non teste")
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +310,14 @@ def run_checks_memory(client):
     check("injection SQL echappee", not err, text[:120])
     err, text = client.tool_text("read_graph", {})
     check("table intacte apres injection", not err, text[:120])
+
+    err, text = client.tool_text("create_entities", {"entities": [
+        {"name": "Note", "entityType": "memo", "observations": ["valeur introuvable ailleurs"]},
+    ]})
+    check("entite de test creee", not err, text[:120])
+    err, text = client.tool_text("read_graph", {})
+    check("read_graph contenant 'introuvable' -> isError false",
+          not err and "introuvable" in text, text[:120])
 
     err, text = client.tool_text("create_relations", {"relations": [
         {"from": "Inconnu", "to": "Bob", "relationType": "x"},

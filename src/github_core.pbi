@@ -137,7 +137,7 @@ EndProcedure
 ; Verifie token configure, sinon message pret a renvoyer.
 Procedure.s GhCheckToken()
   If G_GhToken = ""
-    ProcedureReturn "Erreur GitHub : MCP_GITHUB_TOKEN non configure cote serveur."
+    ProcedureReturn ToolFail("Erreur GitHub : MCP_GITHUB_TOKEN non configure cote serveur.")
   EndIf
   ProcedureReturn ""
 EndProcedure
@@ -145,17 +145,17 @@ EndProcedure
 ; Finalise une reponse : JSON valide ou message d'erreur.
 Procedure.s GhFinish(Status.i, Body.s, Context.s)
   If Status = -3
-    ProcedureReturn "Erreur GitHub : MCP_GITHUB_TOKEN non configure cote serveur."
+    ProcedureReturn ToolFail("Erreur GitHub : MCP_GITHUB_TOKEN non configure cote serveur.")
   EndIf
   If Status < 200 Or Status >= 300
-    ProcedureReturn GhErrorText(Status, Body)
+    ProcedureReturn ToolFail(GhErrorText(Status, Body))
   EndIf
   Protected J.i = ParseJSON(#PB_Any, Body)
   If J = 0
-    ProcedureReturn "Erreur : reponse GitHub invalide (JSON illisible) pour " + Context + "."
+    ProcedureReturn ToolFail("Erreur : reponse GitHub invalide (JSON illisible) pour " + Context + ".")
   EndIf
   FreeJSON(J)
-  ProcedureReturn Body
+  ProcedureReturn ToolOk(Body)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ Procedure.s ToolGhGetRepo(Owner.s, Repo.s)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
   Protected Status.i
   Protected Body.s = GhGet("/repos/" + UrlEncodeComponent(Owner) + "/" + UrlEncodeComponent(Repo), @Status)
@@ -177,12 +177,12 @@ Procedure.s ToolGhListIssues(Owner.s, Repo.s, State.s, Page.i, PerPage.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
   Protected St.s = LCase(Trim(State))
   If St = "" : St = "open" : EndIf
   If St <> "open" And St <> "closed" And St <> "all"
-    ProcedureReturn "Erreur : state doit etre open, closed ou all."
+    ProcedureReturn ToolFail("Erreur : state doit etre open, closed ou all.")
   EndIf
   Protected PageN.i = GhClampPage(Page), PP.i = GhClampPerPage(PerPage)
   Protected Status.i
@@ -195,9 +195,9 @@ Procedure.s ToolGhGetIssue(Owner.s, Repo.s, Number.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
-  If Number < 1 : ProcedureReturn "Erreur : 'number' doit etre >= 1." : EndIf
+  If Number < 1 : ProcedureReturn ToolFail("Erreur : 'number' doit etre >= 1.") : EndIf
   Protected Status.i
   Protected Body.s = GhGet("/repos/" + UrlEncodeComponent(Owner) + "/" + UrlEncodeComponent(Repo) +
                            "/issues/" + Str(Number), @Status)
@@ -219,13 +219,13 @@ Procedure.s ToolGhCreateIssue(Owner.s, Repo.s, Title.s, BodyText.s, Confirm.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
   If Trim(Title) = ""
-    ProcedureReturn "Erreur : 'title' est requis."
+    ProcedureReturn ToolFail("Erreur : 'title' est requis.")
   EndIf
   If Not Confirm
-    ProcedureReturn "Erreur : creation d'issue non confirmee (confirm=true requis)."
+    ProcedureReturn ToolFail("Erreur : creation d'issue non confirmee (confirm=true requis).")
   EndIf
   Protected Status.i
   Protected Body.s = GhPost("/repos/" + UrlEncodeComponent(Owner) + "/" + UrlEncodeComponent(Repo) + "/issues",
@@ -237,12 +237,12 @@ Procedure.s ToolGhListPullRequests(Owner.s, Repo.s, State.s, Page.i, PerPage.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
   Protected St.s = LCase(Trim(State))
   If St = "" : St = "open" : EndIf
   If St <> "open" And St <> "closed" And St <> "all"
-    ProcedureReturn "Erreur : state doit etre open, closed ou all."
+    ProcedureReturn ToolFail("Erreur : state doit etre open, closed ou all.")
   EndIf
   Protected PageN.i = GhClampPage(Page), PP.i = GhClampPerPage(PerPage)
   Protected Status.i
@@ -255,9 +255,9 @@ Procedure.s ToolGhGetPullRequest(Owner.s, Repo.s, Number.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
-  If Number < 1 : ProcedureReturn "Erreur : 'number' doit etre >= 1." : EndIf
+  If Number < 1 : ProcedureReturn ToolFail("Erreur : 'number' doit etre >= 1.") : EndIf
   Protected Status.i
   Protected Body.s = GhGet("/repos/" + UrlEncodeComponent(Owner) + "/" + UrlEncodeComponent(Repo) +
                            "/pulls/" + Str(Number), @Status)
@@ -280,13 +280,13 @@ Procedure.s ToolGhCreatePullRequest(Owner.s, Repo.s, Title.s, Head.s, Base.s, Bo
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo) Or Not GhSafeSegment(Head) Or Not GhSafeSegment(Base)
-    ProcedureReturn "Erreur : owner/repo/head/base invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo/head/base invalides.")
   EndIf
   If Trim(Title) = ""
-    ProcedureReturn "Erreur : 'title' est requis."
+    ProcedureReturn ToolFail("Erreur : 'title' est requis.")
   EndIf
   If Not Confirm
-    ProcedureReturn "Erreur : creation de pull request non confirmee (confirm=true requis)."
+    ProcedureReturn ToolFail("Erreur : creation de pull request non confirmee (confirm=true requis).")
   EndIf
   Protected Status.i
   Protected Body.s = GhPost("/repos/" + UrlEncodeComponent(Owner) + "/" + UrlEncodeComponent(Repo) + "/pulls",
@@ -298,10 +298,10 @@ Procedure.s ToolGhListCommits(Owner.s, Repo.s, Sha.s, Page.i, PerPage.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GhSafeSegment(Owner) Or Not GhSafeSegment(Repo)
-    ProcedureReturn "Erreur : owner/repo invalides."
+    ProcedureReturn ToolFail("Erreur : owner/repo invalides.")
   EndIf
   If Sha <> "" And Not GhSafeSegment(Sha)
-    ProcedureReturn "Erreur : 'sha' invalide."
+    ProcedureReturn ToolFail("Erreur : 'sha' invalide.")
   EndIf
   Protected PageN.i = GhClampPage(Page), PP.i = GhClampPerPage(PerPage)
   Protected Status.i
@@ -318,7 +318,7 @@ Procedure.s ToolGhSearchCode(Query.s, Page.i, PerPage.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : 'query' ne peut pas etre vide."
+    ProcedureReturn ToolFail("Erreur : 'query' ne peut pas etre vide.")
   EndIf
   Protected PageN.i = GhClampPage(Page), PP.i = GhClampPerPage(PerPage)
   Protected Status.i
@@ -331,7 +331,7 @@ Procedure.s ToolGhSearchRepositories(Query.s, Page.i, PerPage.i)
   Protected Bad.s = GhCheckToken()
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : 'query' ne peut pas etre vide."
+    ProcedureReturn ToolFail("Erreur : 'query' ne peut pas etre vide.")
   EndIf
   Protected PageN.i = GhClampPage(Page), PP.i = GhClampPerPage(PerPage)
   Protected Status.i

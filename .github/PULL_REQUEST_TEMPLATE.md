@@ -5,7 +5,7 @@
 ## Vérifications effectuées
 
 - [ ] Compilation : `build.bat` / `./build.sh` OK
-- [ ] Tests : `run_all.bat` / `./run_all.sh` → 10/10 étapes (177 unitaires,
+- [ ] Tests : `run_all.bat` / `./run_all.sh` → 10/10 étapes (195 unitaires,
       17 robustesse/perf, 100 intégration)
 - [ ] Nouvel outil MCP éventuel : ajouté au catalogue, au dispatch, entrées assainies, testé
 - [ ] Messages d'échec détectés comme erreurs (`Erreur` / `Impossible` / `Echec` / `introuvable` / `refusee` / `depasse`)

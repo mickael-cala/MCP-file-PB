@@ -138,7 +138,7 @@ EndProcedure
 ;   {"columns": [...], "rows": [[...]], "rowCount": n, "truncated": bool}
 Procedure.s DbRunQueryText(DB.i, Query.s)
   If Not DatabaseQuery(DB, Query)
-    ProcedureReturn "Erreur SQL : " + DatabaseError()
+    ProcedureReturn ToolFail("Erreur SQL : " + DatabaseError())
   EndIf
 
   Protected J.i = CreateJSON(#PB_Any)
@@ -192,17 +192,17 @@ Procedure.s DbRunQueryText(DB.i, Query.s)
 
   Protected Out.s = ComposeJSON(J)
   FreeJSON(J)
-  ProcedureReturn Out
+  ProcedureReturn ToolOk(Out)
 EndProcedure
 
 ; Execute une requete en respectant le garde-fou lecture seule.
 Procedure.s DbExecuteGuarded(DB.i, Query.s)
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : requete vide."
+    ProcedureReturn ToolFail("Erreur : requete vide.")
   EndIf
   If Not G_DBAllowWrite And Not IsReadOnlyQuery(Query)
     LogError("Requete refusee (lecture seule) : " + Left(Query, 120))
-    ProcedureReturn "Erreur : requete en ecriture refusee. Definir MCP_DB_ALLOW_WRITE=1 cote serveur pour l'autoriser."
+    ProcedureReturn ToolFail("Erreur : requete en ecriture refusee. Definir MCP_DB_ALLOW_WRITE=1 cote serveur pour l'autoriser.")
   EndIf
 
   If IsReadOnlyQuery(Query)
@@ -212,7 +212,7 @@ Procedure.s DbExecuteGuarded(DB.i, Query.s)
   ; Ecriture (autorisee par MCP_DB_ALLOW_WRITE)
   Protected Affected.i = DatabaseUpdate(DB, Query)
   If Affected = 0 And DatabaseError() <> ""
-    ProcedureReturn "Erreur SQL : " + DatabaseError()
+    ProcedureReturn ToolFail("Erreur SQL : " + DatabaseError())
   EndIf
   ProcedureReturn "Requete executee avec succes (" + Str(Affected) + " ligne(s) affectee(s))."
 EndProcedure
@@ -255,7 +255,7 @@ EndProcedure
 ; db_describe_table
 Procedure.s ToolDbDescribeTable(Engine.s, Table.s, Schema.s)
   If Trim(Table) = ""
-    ProcedureReturn "Erreur : 'table' est requis."
+    ProcedureReturn ToolFail("Erreur : 'table' est requis.")
   EndIf
   Protected Msg.String\s
   Protected DB.i = DbResolve(Engine, @Msg)
@@ -283,10 +283,10 @@ EndProcedure
 ; db_explain
 Procedure.s ToolDbExplain(Engine.s, Query.s)
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : requete vide."
+    ProcedureReturn ToolFail("Erreur : requete vide.")
   EndIf
   If Not IsReadOnlyQuery(Query)
-    ProcedureReturn "Erreur : EXPLAIN est reserve aux requetes en lecture seule."
+    ProcedureReturn ToolFail("Erreur : EXPLAIN est reserve aux requetes en lecture seule.")
   EndIf
   Protected Msg.String\s
   Protected DB.i = DbResolve(Engine, @Msg)

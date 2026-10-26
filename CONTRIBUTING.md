@@ -13,7 +13,7 @@ avec les modèles fournis (bug, fonctionnalité). Incluez si possible :
 
 - le système d'exploitation et la version de PureBasic ;
 - le serveur concerné et la requête JSON-RPC envoyée / réponse obtenue ;
-- le résultat de `python tests/test_mcp.py` (100 tests) et/ou
+- le résultat de `python tests/test_mcp.py` (121 tests) et/ou
   `run_all.bat` / `./run_all.sh`.
 
 ## Soumettre une modification
@@ -65,6 +65,9 @@ avec les modèles fournis (bug, fonctionnalité). Incluez si possible :
 - Intégration : `tests/test_mcp.py` (harnais `tests/mcp_client.py` ; mock
   GitHub dans `tests/mock_github.py` ; PostgreSQL et Context7 live sont
   conditionnels).
+- Nouveaux outils : retourner les erreurs via `ToolFail(...)` et les payloads
+  via `ToolOk(...)` (voir `mcp_common/json_helpers.pbi`), et valider toute URL
+  distante avec `mcp_common/net_guard.pbi`.
 - `run_all` doit être **vert (10/10)** avant toute pull request, y compris
   les tests de robustesse/performance (`tests/test_robustness.py`).
 

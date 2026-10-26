@@ -20,8 +20,8 @@ travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
    build.bat                  # ou ./build.sh : compile les 8 serveurs
    run_all.bat                # ou ./run_all.sh : unitaires + intégration + rapport
    ```
-   Attendu : **10/10 étapes**, **177 tests unitaires** (24+33+37+19+24+40),
-   **17/17 robustesse/performance** et **100/100 tests d'intégration**. Si ce n'est pas le cas, corriger avant
+   Attendu : **10/10 étapes**, **195 tests unitaires** (42+33+37+19+24+40),
+   **17/17 robustesse/performance** et **121/121 tests d'intégration**. Si ce n'est pas le cas, corriger avant
    toute nouvelle fonctionnalité.
 4. **Choisir la suite** : voir [ROADMAP.md](ROADMAP.md). Ne jamais démarrer
    une phase sans avoir vert `run_all`.
@@ -36,7 +36,7 @@ export PBCOMPILER=$HOME/purebasic-demo/purebasic_demo/compilers/pbcompiler
 export PUREBASIC_HOME=$HOME/purebasic-demo/purebasic_demo
 ./build.sh && ./run_all.sh
 ```
-Attendu : 10/10 étapes (177 unitaires, 17 robustesse/perf, 100 intégration).
+Attendu : 10/10 étapes (195 unitaires, 17 robustesse/perf, 121 intégration).
 Attention : `build/` est partagé avec Windows si le dépôt est sur `/mnt/c` —
 relancer `build.bat` après une validation Linux.
 
@@ -108,7 +108,7 @@ build.bat              # Windows : compile les 8 serveurs -> build\*.exe
 ./build.sh             # Linux/macOS : compile les 8 serveurs -> build/
 run_all.bat            # compilation + 6 suites unitaires + robustesse/perf + intégration + report.html
 ./run_all.sh           # idem sous Linux/macOS
-python tests/test_mcp.py [serveur]   # intégration seule (100 tests)
+python tests/test_mcp.py [serveur]   # intégration seule (121 tests)
 ./clean.sh             # nettoie build/
 ```
 
@@ -119,8 +119,9 @@ Ordre d'inclusion dans un serveur :
 ```purebasic
 IncludeFile "../mcp_common/stdio.pbi"        ; E/S stdio, stderr, CheckStdio
 IncludeFile "../mcp_common/logging.pbi"      ; LogDebug / LogError (stderr)
-IncludeFile "../mcp_common/json_helpers.pbi" ; GetArg*, AddProp*, ToolDef
+IncludeFile "../mcp_common/json_helpers.pbi" ; GetArg*, AddProp*, ToolDef, ToolOk/ToolFail
 IncludeFile "../mcp_common/http.pbi"         ; HttpGetHeaders / HttpPostHeaders (API web)
+IncludeFile "../mcp_common/net_guard.pbi"    ; anti-SSRF (serveurs qui fetchent une URL)
 IncludeFile "../mcp_common/protocol.pbi"     ; identité + initialize
 IncludeFile "../mcp_common/jsonrpc.pbi"      ; noyau JSON-RPC + MCPMainLoop
 ```
@@ -136,7 +137,14 @@ Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
    (fiables en mode pipe). Logs uniquement sur **stderr**.
 3. Sélection OS par `CompilerIf #PB_Compiler_OS = #PB_OS_Windows` /
    `CompilerElse` — le code doit compiler sur les 3 plateformes.
-4. Commentaires et messages d'erreur en **français**, style du fichier.
+4. **`isError` explicite** : tout retour d'erreur d'un outil passe par
+   `ToolFail(...)`, tout payload de données (JSON, listing, contenu) par
+   `ToolOk(...)`. L'heuristique `DetectIsError` n'est qu'un filet de sécurité
+   sur la première ligne ; elle ne doit jamais voir un payload.
+5. **Anti-SSRF** : toute URL distante passe par `NetGuardValidateUrl()`
+   (résolution de **toutes** les adresses) ; les redirections sont suivies
+   manuellement, bornées et revalidées.
+6. Commentaires et messages d'erreur en **français**, style du fichier.
 5. Aucune duplication de code stdio/JSON-RPC/HTTP dans un serveur : tout va
    dans `mcp_common/`.
 6. Tout nouvel outil MCP doit :
@@ -216,7 +224,7 @@ build.bat/build.sh                compilation des 8 serveurs ; clean.* : nettoya
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
 tests/mock_github.py              mock local de l'API GitHub
-tests/test_mcp.py                 tests d'integration des 8 serveurs (100 tests)
+tests/test_mcp.py                 tests d'integration des 8 serveurs (121 tests)
 tests/unit_test.pbi               framework de tests unitaires PureBasic
 tests/test_common.pb              tests unitaires mcp_common (24 tests)
 tests/test_memory.pb              tests unitaires Memory (33 tests)

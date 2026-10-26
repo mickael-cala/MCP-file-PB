@@ -111,13 +111,21 @@ echo
 echo "=== Rapport ==="
 echo "Etapes reussies : $STEP_OK, echouees : $STEP_KO"
 
-python3 tests/make_report.py "$STEP_OK" "$STEP_KO" || python tests/make_report.py "$STEP_OK" "$STEP_KO"
+if command -v python3 >/dev/null 2>&1; then
+    python3 tests/make_report.py "$STEP_OK" "$STEP_KO"
+elif command -v python >/dev/null 2>&1; then
+    python tests/make_report.py "$STEP_OK" "$STEP_KO"
+else
+    # Repli sans Python : rapport HTML minimal (le detail par serveur est
+    # produit par tests/make_report.py depuis tests/report.json).
+    cat > tests/report.html <<EOF
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Rapport de tests MCPserver-StdioSuite</title></head><body>
 <h1>Rapport de tests</h1>
 <p>Etapes reussies : $STEP_OK - echouees : $STEP_KO</p>
 </body></html>
 EOF
+fi
 echo "Rapport genere : tests/report.html"
 
 [ "$STEP_KO" -eq 0 ]

@@ -12,79 +12,57 @@ EnableExplicit
 IncludeFile "../mcp_common/stdio.pbi"
 IncludeFile "../mcp_common/logging.pbi"
 IncludeFile "../mcp_common/json_helpers.pbi"
+IncludeFile "../mcp_common/http.pbi"
+IncludeFile "../mcp_common/net_guard.pbi"
 IncludeFile "../mcp_common/protocol.pbi"
 IncludeFile "../mcp_common/jsonrpc.pbi"
 
 ; ---------------------------------------------------------------------------
-; Validation d'URL et garde-fous de securite
+; Recuperation HTTP validee (anti-SSRF) avec redirections bornees
 ; ---------------------------------------------------------------------------
-Procedure.i IsPrivateHost(Host.s)
-  ; Refuse les adresses privees / loopback / link-local (comme la reference)
-  Host = LCase(Trim(Host))
-  If Host = "localhost" Or Host = "127.0.0.1" Or Host = "::1"
-    ProcedureReturn #True
-  EndIf
-  ; Plages IPv4 privees courantes
-  Protected Part1.i
-  If FindString(Host, ".") > 0
-    Part1 = Val(StringField(Host, 1, "."))
-    If Part1 = 10 : ProcedureReturn #True : EndIf
-    If Part1 = 172
-      Protected Part2.i = Val(StringField(Host, 2, "."))
-      If Part2 >= 16 And Part2 <= 31 : ProcedureReturn #True : EndIf
-    EndIf
-    If Part1 = 192
-      Protected P2.i = Val(StringField(Host, 2, "."))
-      If P2 = 168 : ProcedureReturn #True : EndIf
-    EndIf
-    If Part1 = 169
-      Protected P2b.i = Val(StringField(Host, 2, "."))
-      If P2b = 254 : ProcedureReturn #True : EndIf   ; link-local / metadata
-    EndIf
-  EndIf
-  ProcedureReturn #False
-EndProcedure
+;  Codes de statut synthetiques :
+;    -2 = URL refusee (schema, hote prive/loopback, resolution impossible)
+;    -3 = trop de redirections (maximum arbitre ci-dessous)
+;  Chaque saut (3 au maximum) repasse par NetGuardValidateUrl(), donc une
+;  redirection vers une cible privee est refusee avant toute connexion.
+#FETCH_MAX_REDIRECTS = 3
 
-Procedure.s ValidateFetchUrl(Url.s)
-  Url = Trim(Url)
-  If Url = "" : ProcedureReturn "" : EndIf
-  Protected Scheme.s = LCase(GetURLPart(Url, #PB_URL_Protocol))
-  If Scheme <> "http" And Scheme <> "https"
-    ProcedureReturn ""
-  EndIf
-  Protected Host.s = GetURLPart(Url, #PB_URL_Site)
-  If Host = "" Or IsPrivateHost(Host)
-    ProcedureReturn ""
-  EndIf
-  ProcedureReturn Url
-EndProcedure
+Procedure.s FetchGetValidated(Url.s, *OutStatus.Integer)
+  Protected Current.s = Trim(Url)
+  Protected Hop.i, Status.i, Body.s, Loc.s, NextUrl.s
 
-; ---------------------------------------------------------------------------
-; Recuperation HTTP en memoire
-; ---------------------------------------------------------------------------
-Procedure.s HttpGetMemory(Url.s, *OutStatus.Integer)
-  Protected Req.i = HTTPRequestMemory(#PB_HTTP_Get, Url)
-  If Not Req
-    *OutStatus\i = -1
+  If NetGuardValidateUrl(Current) = ""
+    *OutStatus\i = -2
     ProcedureReturn ""
   EndIf
 
-  Protected Status.i = Val(HTTPInfo(Req, #PB_HTTP_StatusCode))
-  *OutStatus\i = Status
+  For Hop = 0 To #FETCH_MAX_REDIRECTS
+    Status = -1
+    HttpNoRedirect(#True)
+    Body = HttpGetHeaders(Current, "", 15, @Status)
+    HttpNoRedirect(#False)
 
-  Protected Result.s = ""
-  If Status >= 200 And Status < 300
-    Protected *Buf = HTTPMemory(Req)
-    If *Buf
-      Protected Size.i = MemorySize(*Buf)
-      If Size > 0
-        Result = PeekS(*Buf, Size, #PB_UTF8 | #PB_ByteLength)
+    If Status >= 300 And Status < 400
+      Loc = G_HttpLastLocation
+      If Loc = ""
+        *OutStatus\i = Status
+        ProcedureReturn ""
       EndIf
+      NextUrl = NetGuardResolveLocation(Current, Loc)
+      If NextUrl = "" Or NetGuardValidateUrl(NextUrl) = ""
+        *OutStatus\i = -2
+        ProcedureReturn ""
+      EndIf
+      Current = NextUrl
+      Continue
     EndIf
-  EndIf
 
-  FinishHTTP(Req)
-  ProcedureReturn Result
+    *OutStatus\i = Status
+    ProcedureReturn Body
+  Next
+
+  *OutStatus\i = -3
+  ProcedureReturn ""
 EndProcedure
 
 ; ---------------------------------------------------------------------------
@@ -207,18 +185,19 @@ Procedure.s ToolFetch(ArgsObj.i)
   Protected StartIndex.i  = GetArgInt(ArgsObj, "start_index", 0)
   Protected Raw.i         = GetArgBool(ArgsObj, "raw", 0)
 
-  Protected SafeUrl.s = ValidateFetchUrl(Url)
-  If SafeUrl = ""
-    ProcedureReturn "ERREUR: URL invalide ou hote prive/loopback refuse."
-  EndIf
-
   Protected Status.i
-  Protected Html.s = HttpGetMemory(SafeUrl, @Status)
+  Protected Html.s = FetchGetValidated(Url, @Status)
+  If Status = -2
+    ProcedureReturn ToolFail("ERREUR: URL invalide ou hote prive/loopback refuse.")
+  EndIf
+  If Status = -3
+    ProcedureReturn ToolFail("ERREUR: trop de redirections (maximum " + Str(#FETCH_MAX_REDIRECTS) + ").")
+  EndIf
   If Status < 200 Or Status >= 300
-    ProcedureReturn "ERREUR: echec HTTP (statut " + Str(Status) + ") pour " + SafeUrl
+    ProcedureReturn ToolFail("ERREUR: echec HTTP (statut " + Str(Status) + ") pour " + Trim(Url))
   EndIf
   If Html = ""
-    ProcedureReturn "ERREUR: contenu vide ou illisible."
+    ProcedureReturn ToolFail("ERREUR: contenu vide ou illisible.")
   EndIf
 
   Protected Content.s
@@ -230,7 +209,7 @@ Procedure.s ToolFetch(ArgsObj.i)
 
   Protected TotalLen.i = Len(Content)
   If StartIndex >= TotalLen
-    ProcedureReturn "ERREUR: start_index (" + Str(StartIndex) + ") depasse la taille du contenu (" + Str(TotalLen) + " caracteres)."
+    ProcedureReturn ToolFail("ERREUR: start_index (" + Str(StartIndex) + ") depasse la taille du contenu (" + Str(TotalLen) + " caracteres).")
   EndIf
 
   Protected EndIndex.i = StartIndex + MaxLength
@@ -243,7 +222,7 @@ Procedure.s ToolFetch(ArgsObj.i)
   EndIf
   Result + "]"
 
-  ProcedureReturn Result
+  ProcedureReturn ToolOk(Result)
 EndProcedure
 
 ; ---------------------------------------------------------------------------

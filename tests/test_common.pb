@@ -11,6 +11,9 @@ IncludeFile "../mcp_common/stdio.pbi"
 IncludeFile "../mcp_common/json_helpers.pbi"
 IncludeFile "../mcp_common/protocol.pbi"
 IncludeFile "../mcp_common/jsonrpc.pbi"  ; DetectIsError
+IncludeFile "../mcp_common/net_guard.pbi" ; classification reseau
+IncludeFile "../mcp_common/logging.pbi"   ; requis par http.pbi (LogError)
+IncludeFile "../mcp_common/http.pbi"      ; HttpHeaderValue (en-tetes)
 IncludeFile "../tests/unit_test.pbi"
 
 ; ---------------------------------------------------------------------------
@@ -74,6 +77,38 @@ Procedure TestSchemaBuilders()
 EndProcedure
 
 ; ---------------------------------------------------------------------------
+; http : extraction d'un en-tete (CRLF WinHTTP / LF curl)
+; ---------------------------------------------------------------------------
+Procedure TestHttpHeaderValue()
+  Protected Crlf.s = "HTTP/1.1 302 Found" + #CRLF$ + "Location: /a" + #CRLF$ + "Server: x" + #CRLF$
+  Protected Lf.s   = "HTTP/2 302 " + #LF$ + "location: /b" + #LF$ + "server: y" + #LF$
+  UTAssertStr("/a", HttpHeaderValue(Crlf, "location"), "en-tete CRLF")
+  UTAssertStr("/b", HttpHeaderValue(Lf, "location"), "en-tete LF (curl)")
+  UTAssertStr("", HttpHeaderValue(Lf, "absent"), "en-tete absent -> vide")
+  UTAssertStr("x", HttpHeaderValue(Crlf, "server"), "en-tete insensible a la casse")
+EndProcedure
+
+; ---------------------------------------------------------------------------
+; net_guard : classification IPv4 (fonctions pures, sans DNS)
+; ---------------------------------------------------------------------------
+Procedure TestNetGuardIPv4()
+  UTAssert(#False, NetGuardIPv4IsGlobal(127, 0, 0, 1), "127.0.0.1 prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(10, 1, 2, 3), "10/8 prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(172, 20, 1, 1), "172.16/12 prive")
+  UTAssert(#True,  NetGuardIPv4IsGlobal(172, 32, 1, 1), "172.32 public")
+  UTAssert(#False, NetGuardIPv4IsGlobal(192, 168, 1, 1), "192.168/16 prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(169, 254, 169, 254), "169.254/16 link-local")
+  UTAssert(#False, NetGuardIPv4IsGlobal(100, 64, 0, 1), "100.64/10 CGNAT")
+  UTAssert(#False, NetGuardIPv4IsGlobal(198, 51, 100, 1), "TEST-NET-2 prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(203, 0, 113, 5), "TEST-NET-3 prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(224, 0, 0, 1), "multicast prive")
+  UTAssert(#False, NetGuardIPv4IsGlobal(0, 0, 0, 0), "unspecified prive")
+  UTAssert(#True,  NetGuardIPv4IsGlobal(8, 8, 8, 8), "8.8.8.8 public")
+  UTAssert(#True,  NetGuardIPv4IsGlobal(1, 1, 1, 1), "1.1.1.1 public")
+  UTAssert(#True,  NetGuardIPv4IsGlobal(93, 184, 216, 34), "example.com public")
+EndProcedure
+
+; ---------------------------------------------------------------------------
 ; Programme principal
 ; -------------------------------------------------------------------
 If Not CheckStdio()
@@ -83,6 +118,8 @@ EndIf
 TestGetArgs()
 TestDetectIsError()
 TestSchemaBuilders()
+TestNetGuardIPv4()
+TestHttpHeaderValue()
 
 UTFinalize()
 

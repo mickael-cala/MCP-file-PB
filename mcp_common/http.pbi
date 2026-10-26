@@ -33,9 +33,56 @@ Procedure.s UrlEncodeComponent(S.s)
   ProcedureReturn Out
 EndProcedure
 
+; Mode sans suivi automatique des redirections (utilise par fetch, qui
+; revalide chaque cible). G_HttpLastLocation recoit l'en-tete Location.
+Global G_HttpNoRedirect.i = 0
+Global G_HttpLastLocation.s = ""
+
+Procedure HttpNoRedirect(Flag.i)
+  G_HttpNoRedirect = Bool(Flag)
+EndProcedure
+
+; Lit un fichier texte entier (ReadString() s'arrete a la fin de ligne).
+Procedure.s HttpReadWholeFile(FilePath.s)
+  Protected F.i = ReadFile(#PB_Any, FilePath)
+  If F = 0 : ProcedureReturn "" : EndIf
+  Protected Size.q = Lof(F)
+  Protected Out.s = ""
+  If Size > 0
+    Protected *Buf = AllocateMemory(Size + 1)
+    If *Buf
+      Protected BytesRead.i = ReadData(F, *Buf, Size)
+      If BytesRead > 0
+        Out = PeekS(*Buf, BytesRead, #PB_UTF8 | #PB_ByteLength)
+      EndIf
+      FreeMemory(*Buf)
+    EndIf
+  EndIf
+  CloseFile(F)
+  ProcedureReturn Out
+EndProcedure
+
+; Extrait la valeur d'un en-tete depuis un bloc d'en-tetes brut.
+; Accepte les fins de ligne CRLF (WinHTTP) et LF (curl sous Linux/macOS).
+Procedure.s HttpHeaderValue(RawHeaders.s, Name.s)
+  Protected Raw.s = ReplaceString(RawHeaders, #CR$, "")
+  Protected Count.i = CountString(Raw, #LF$) + 1
+  Protected i.i, Line.s, Prefix.s = LCase(Name) + ":"
+  For i = 1 To Count
+    Line = Trim(StringField(Raw, i, #LF$))
+    If LCase(Left(Line, Len(Prefix))) = Prefix
+      ProcedureReturn Trim(Mid(Line, Len(Prefix) + 1))
+    EndIf
+  Next
+  ProcedureReturn ""
+EndProcedure
+
 CompilerIf #PB_Compiler_OS = #PB_OS_Windows
 
 #WINHTTP_FLAG_SECURE = $00800000
+#WINHTTP_OPTION_DISABLE_FEATURE = 9
+#WINHTTP_DISABLE_REDIRECTS = $00000002
+#WINHTTP_QUERY_RAW_HEADERS_CRLF = 22
 #WINHTTP_QUERY_STATUS_CODE = 19
 #WINHTTP_QUERY_FLAG_NUMBER = $20000000
 
@@ -50,6 +97,7 @@ PrototypeC whttpQueryDataAvailable(hRequest.i, lpdwNumberOfBytesAvailable.i)
 PrototypeC whttpReadData(hRequest.i, lpBuffer.i, dwNumberOfBytesToRead.i, lpdwNumberOfBytesRead.i)
 PrototypeC whttpCloseHandle(hInternet.i)
 PrototypeC whttpSetTimeouts(hInternet.i, dwResolveTimeout.i, dwConnectTimeout.i, dwSendTimeout.i, dwReceiveTimeout.i)
+PrototypeC whttpSetOption(hInternet.i, dwOption.i, lpBuffer.i, dwBufferLength.i)
 
 Global hWinHTTP.i = 0
 Global whttp_WinHttpOpen.whttpOpen
@@ -63,6 +111,7 @@ Global whttp_WinHttpQueryDataAvailable.whttpQueryDataAvailable
 Global whttp_WinHttpReadData.whttpReadData
 Global whttp_WinHttpCloseHandle.whttpCloseHandle
 Global whttp_WinHttpSetTimeouts.whttpSetTimeouts
+Global whttp_WinHttpSetOption.whttpSetOption
 
 Procedure.i HttpInit()
   If hWinHTTP : ProcedureReturn #True : EndIf
@@ -79,6 +128,7 @@ Procedure.i HttpInit()
   whttp_WinHttpReadData          = GetFunction(hWinHTTP, "WinHttpReadData")
   whttp_WinHttpCloseHandle       = GetFunction(hWinHTTP, "WinHttpCloseHandle")
   whttp_WinHttpSetTimeouts       = GetFunction(hWinHTTP, "WinHttpSetTimeouts")
+  whttp_WinHttpSetOption         = GetFunction(hWinHTTP, "WinHttpSetOption")
   If whttp_WinHttpOpen = 0 Or whttp_WinHttpSendRequest = 0 Or whttp_WinHttpReadData = 0
     ProcedureReturn #False
   EndIf
@@ -89,6 +139,7 @@ EndProcedure
 ; Method.s = "GET" ou "POST" ; Body.s utilise pour POST.
 Procedure.s HttpWinRequest(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *Status.Integer)
   *Status\i = -1
+  G_HttpLastLocation = ""
   If Not HttpInit() : ProcedureReturn "" : EndIf
 
   Protected Server.s = GetURLPart(Url, #PB_URL_Site)
@@ -117,6 +168,12 @@ Procedure.s HttpWinRequest(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *St
   If hRequest = 0
     whttp_WinHttpCloseHandle(hConnect) : whttp_WinHttpCloseHandle(hSession)
     ProcedureReturn ""
+  EndIf
+
+  ; Redirections : desactivees a la demande (chaque cible est revalidee).
+  If G_HttpNoRedirect And whttp_WinHttpSetOption
+    Protected NoRedirectFlag.i = #WINHTTP_DISABLE_REDIRECTS
+    whttp_WinHttpSetOption(hRequest, #WINHTTP_OPTION_DISABLE_FEATURE, @NoRedirectFlag, 4)
   EndIf
 
   If Headers <> ""
@@ -155,6 +212,18 @@ Procedure.s HttpWinRequest(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *St
   Protected Code.i = 0, CodeLen.i = 4
   If whttp_WinHttpQueryHeaders(hRequest, #WINHTTP_QUERY_STATUS_CODE | #WINHTTP_QUERY_FLAG_NUMBER, 0, @Code, @CodeLen, 0)
     *Status\i = Code
+  EndIf
+
+  ; Recupere Location quand le suivi automatique est desactive.
+  If G_HttpNoRedirect And Code >= 300 And Code < 400
+    Protected *HdrBuf = AllocateMemory(16384)
+    If *HdrBuf
+      Protected HdrLen.i = 16384
+      If whttp_WinHttpQueryHeaders(hRequest, #WINHTTP_QUERY_RAW_HEADERS_CRLF, 0, *HdrBuf, @HdrLen, 0)
+        G_HttpLastLocation = HttpHeaderValue(PeekS(*HdrBuf, -1, #PB_Unicode), "location")
+      EndIf
+      FreeMemory(*HdrBuf)
+    EndIf
   EndIf
 
   Protected *Buf = AllocateMemory(65536)
@@ -200,10 +269,12 @@ EndProcedure
 
 Procedure.s HttpCurl(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *Status.Integer)
   *Status\i = -1
+  G_HttpLastLocation = ""
   Protected Base.s = GetTemporaryDirectory() + "mcp_http_" + Str(Date()) + "_" + Str(Random(999999))
   Protected CfgFile.s = Base + ".cfg"
   Protected OutFile.s = Base + ".out"
   Protected BodyFile.s = Base + ".body"
+  Protected HdrFile.s = Base + ".hdr"
 
   Protected F.i = CreateFile(#PB_Any, CfgFile)
   If F = 0 : ProcedureReturn "" : EndIf
@@ -214,6 +285,9 @@ Procedure.s HttpCurl(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *Status.I
   WriteString(F, "url = " + #DQUOTE$ + CurlEsc(Url) + #DQUOTE$ + #LF$, #PB_UTF8)
   WriteString(F, "output = " + #DQUOTE$ + CurlEsc(OutFile) + #DQUOTE$ + #LF$, #PB_UTF8)
   WriteString(F, "write-out = " + #DQUOTE$ + "%{http_code}" + #DQUOTE$ + #LF$, #PB_UTF8)
+  If G_HttpNoRedirect
+    WriteString(F, "dump-header = " + #DQUOTE$ + CurlEsc(HdrFile) + #DQUOTE$ + #LF$, #PB_UTF8)
+  EndIf
 
   ; En-tetes (separees par CRLF dans le parametre Headers)
   If Headers <> ""
@@ -254,13 +328,16 @@ Procedure.s HttpCurl(Url.s, Method.s, Headers.s, Body.s, TimeoutSec.i, *Status.I
   CloseProgram(Prog)
 
   Protected Result.s = ""
+  If G_HttpNoRedirect
+    Protected RawHdr.s = HttpReadWholeFile(HdrFile)
+    If RawHdr <> ""
+      G_HttpLastLocation = HttpHeaderValue(RawHdr, "location")
+    EndIf
+    DeleteFile(HdrFile)
+  EndIf
   If ExitCode = 0
     *Status\i = Val(Trim(Out))
-    Protected R.i = ReadFile(#PB_Any, OutFile)
-    If R
-      Result = ReadString(R, #PB_UTF8, Lof(R))
-      CloseFile(R)
-    EndIf
+    Result = HttpReadWholeFile(OutFile)
     If *Status\i = 0 : *Status\i = 200 : EndIf   ; write-out vide : succes
   EndIf
 

@@ -4,6 +4,57 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
 
 ## [Non publié]
 
+### Corrigé (sécurité et conformité — suite à audit)
+
+- **Anti-SSRF (`mcp_common/net_guard.pbi`, `src/MCP-Fetch-PB.pb`)** :
+  l'hôte est résolu (`getaddrinfo`) et **toutes** ses adresses doivent être
+  globales. Refus des formes alternatives (`127.1`, `2130706433`, `0.0.0.0`,
+  `[::1]`) et des noms DNS résolvant vers une adresse privée ; résolution
+  impossible = refus (fail-closed). Les redirections ne sont plus suivies
+  automatiquement : 3 sauts maximum, chaque cible revalidée
+  (`mcp_common/http.pbi` : `G_HttpNoRedirect`, `G_HttpLastLocation`).
+- **`delete_file` (`src/fileMCP.pb`)** : nouveau paramètre `recursive`
+  (défaut `false`). Un dossier non vide est désormais refusé avec un message
+  explicite ; la suppression récursive devient un opt-in. La documentation
+  annonçait à tort un comportement non récursif.
+- **`read_file` / `read_file_lines` (`src/fileMCP.pb`)** : `IsBinaryFile()`
+  est enfin appliqué (exe, dll, so, dylib, o, obj, bin, a, lib, ppu) ;
+  message d'erreur explicite, conformément à ERRATA.
+- **`isError` explicite (`mcp_common/json_helpers.pbi`, `jsonrpc.pbi`,
+  les 8 serveurs)** : `ToolStateReset()` / `ToolOk()` / `ToolFail()`.
+  Tous les chemins d'erreur des outils passent par `ToolFail`, les payloads
+  par `ToolOk`. `DetectIsError` n'est plus qu'un filet de sécurité limité à la
+  première ligne (300 caractères) : un `search_files` réussi contenant
+  « introuvable » n'est plus marqué en erreur.
+- **Conformité JSON-RPC (`mcp_common/jsonrpc.pbi`)** : aucune réponse aux
+  notifications (toute requête sans `id`), `-32601 Method not found` pour une
+  méthode inconnue, `-32602 Invalid params` pour `tools/call` sans nom
+  d'outil, échappement correct de l'`id` textuel dans `tools/list`.
+- **HTTP curl (Linux/macOS)** : `HttpHeaderValue()` accepte désormais les fins
+  de ligne **LF** (curl) en plus de CRLF (WinHTTP), et `HttpReadWholeFile()`
+  remplace `ReadString(..., Lof(...))` qui s'arrêtait à la première ligne.
+  Conséquence : les redirections `fetch` sont réellement suivies/revalidées
+  sous Linux et les corps de réponse ne sont plus tronqués.
+- **Tests** : `tests/test_mcp.py` couvre les refus SSRF, le non-récursif par
+  défaut, les binaires, les payloads `isError` et la conformité JSON-RPC ;
+  `tests/test_common.pb` couvre la classification IPv4 (14 assertions) et
+  l'extraction d'en-têtes CRLF/LF (4 assertions).
+  Ajout de `sys.path.insert(...)` dans `tests/test_mcp.py` (compatibilité
+  `python -P` / interpréteur isolé).
+- **Documentation** : README (outils, sécurité SSRF, compteurs), ERRATA
+  (suppression récursive, binaires, `isError`), SECURITY (validation réseau),
+  PLAN (phase 7, Context7/curl), AGENTS (conventions `ToolOk`/`ToolFail` et
+  `net_guard`), CONTRIBUTING, modèles d'issues/PR. Compteurs : **195 tests
+  unitaires**, **121 tests d'intégration**.
+
+- **`run_all.sh`** : bloc heredoc orphelin en fin de script (erreur de
+  syntaxe bash `<!DOCTYPE html>`) ; remplacé par un repli explicite
+  (`python3`, puis `python`, puis rapport HTML minimal). `./run_all.sh`
+  se termine désormais avec le code attendu (0 si tout passe).
+- **Validation** : suite complète rejouée sous **Windows** et sous
+  **WSL2 Ubuntu 26.04** (PureBasic 6.41 Linux x64) — `run_all` **10/10**,
+  **195** tests unitaires, **17/17** robustesse/perf, **121/121** intégration.
+
 ### Corrigé (validation Linux/WSL2)
 - **`build.sh` / `run_all.sh`** utilisaient les options Windows (`/EXE`,
   `/CONSOLE`, `/UNICODE`) : remplacées par les options Linux/macOS

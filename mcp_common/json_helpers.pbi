@@ -101,6 +101,29 @@ EndProcedure
 ; des ';', chaque entree etant 'cle|type|description'. ReqSpec = cles
 ; requises separees par des ';'. Tout est cree nativement dans le document
 ; cible (pas de valeurs partagees -> pas de segfault).
+; ---------------------------------------------------------------------------
+; Etat explicite d'un appel d'outil (pilote isError cote outil)
+; ---------------------------------------------------------------------------
+; 0 = inconnu (outil non instrumente), 1 = succes explicite, -1 = echec explicite.
+; Convention : ToolFail(...) sur chaque chemin d'erreur, ToolOk(...) pour les
+; payloads de donnees (JSON, listing, contenu de fichier). jsonrpc.pbi ne
+; consulte l'heuristique de texte qu'en dernier recours, et jamais sur un payload.
+Global G_ToolState.i = 0
+
+Procedure ToolStateReset()
+  G_ToolState = 0
+EndProcedure
+
+Procedure.s ToolOk(Text.s)
+  G_ToolState = 1
+  ProcedureReturn Text
+EndProcedure
+
+Procedure.s ToolFail(Msg.s)
+  G_ToolState = -1
+  ProcedureReturn Msg
+EndProcedure
+
 Procedure ToolDef(ToolsArr.i, Name.s, Descr.s, PropsSpec.s, ReqSpec.s)
   Protected ToolObj.i = AddJSONElement(ToolsArr)
   SetJSONObject(ToolObj)

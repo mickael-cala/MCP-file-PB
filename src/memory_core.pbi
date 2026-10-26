@@ -162,7 +162,7 @@ EndProcedure
 Procedure.s ToolCreateEntities(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "entities")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'entities' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'entities' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i
@@ -170,19 +170,19 @@ Procedure.s ToolCreateEntities(ArgsObj.i)
 
   ; Une seule transaction : 100 entites passent de ~900 ms a quelques ms
   If DatabaseUpdate(G_MemDB, "BEGIN TRANSACTION") = 0 And DatabaseError() <> ""
-    ProcedureReturn "Erreur SQLite : " + DatabaseError()
+    ProcedureReturn ToolFail("Erreur SQLite : " + DatabaseError())
   EndIf
 
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
       DatabaseUpdate(G_MemDB, "ROLLBACK")
-      ProcedureReturn "Erreur : chaque entite doit etre un objet {name, entityType, observations}."
+      ProcedureReturn ToolFail("Erreur : chaque entite doit etre un objet {name, entityType, observations}.")
     EndIf
     Protected Name.s = GetArgString(Item, "name")
     If Trim(Name) = ""
       DatabaseUpdate(G_MemDB, "ROLLBACK")
-      ProcedureReturn "Erreur : 'name' ne peut pas etre vide. " + Str(Created) + " entite(s) creee(s) avant l'echec."
+      ProcedureReturn ToolFail("Erreur : 'name' ne peut pas etre vide. " + Str(Created) + " entite(s) creee(s) avant l'echec.")
     EndIf
     Protected EType.s = GetArgString(Item, "entityType")
     If EType = "" : EType = "unknown" : EndIf
@@ -191,7 +191,7 @@ Procedure.s ToolCreateEntities(ArgsObj.i)
     DatabaseUpdate(G_MemDB, "INSERT OR IGNORE INTO entities (name, entityType) VALUES (" + SqlQuote(Name) + ", " + SqlQuote(EType) + ")")
     If DatabaseError() <> ""
       DatabaseUpdate(G_MemDB, "ROLLBACK")
-      ProcedureReturn "Erreur SQLite : " + DatabaseError()
+      ProcedureReturn ToolFail("Erreur SQLite : " + DatabaseError())
     EndIf
     If DatabaseUpdate(G_MemDB, "UPDATE entities SET entityType=" + SqlQuote(EType) + " WHERE name=" + SqlQuote(Name)) >= 0
       Created + 1
@@ -221,31 +221,31 @@ EndProcedure
 Procedure.s ToolCreateRelations(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "relations")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'relations' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'relations' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i, Created.i = 0
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
-      ProcedureReturn "Erreur : chaque relation doit etre un objet {from, to, relationType}."
+      ProcedureReturn ToolFail("Erreur : chaque relation doit etre un objet {from, to, relationType}.")
     EndIf
     Protected From.s = GetArgString(Item, "from")
     Protected Dest.s = GetArgString(Item, "to")
     Protected RelType.s = GetArgString(Item, "relationType")
     If From = "" Or Dest = "" Or RelType = ""
-      ProcedureReturn "Erreur : 'from', 'to' et 'relationType' sont requis."
+      ProcedureReturn ToolFail("Erreur : 'from', 'to' et 'relationType' sont requis.")
     EndIf
     ; Integrite referentielle explicite (message clair au lieu d'une erreur FK)
     If Not EntityExists(From)
-      ProcedureReturn "Erreur : entite inconnue '" + From + "'. Relation non creee."
+      ProcedureReturn ToolFail("Erreur : entite inconnue '" + From + "'. Relation non creee.")
     EndIf
     If Not EntityExists(Dest)
-      ProcedureReturn "Erreur : entite inconnue '" + Dest + "'. Relation non creee."
+      ProcedureReturn ToolFail("Erreur : entite inconnue '" + Dest + "'. Relation non creee.")
     EndIf
     DatabaseUpdate(G_MemDB, "INSERT OR IGNORE INTO relations (from_entity, to_entity, relation_type) VALUES (" + SqlQuote(From) + ", " + SqlQuote(Dest) + ", " + SqlQuote(RelType) + ")")
     If DatabaseError() <> ""
-      ProcedureReturn "Erreur SQLite : " + DatabaseError()
+      ProcedureReturn ToolFail("Erreur SQLite : " + DatabaseError())
     EndIf
     Created + 1
   Next
@@ -257,18 +257,18 @@ EndProcedure
 Procedure.s ToolAddObservations(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "observations")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'observations' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'observations' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i, Added.i = 0
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
-      ProcedureReturn "Erreur : chaque observation doit etre un objet {entityName, contents}."
+      ProcedureReturn ToolFail("Erreur : chaque observation doit etre un objet {entityName, contents}.")
     EndIf
     Protected Name.s = GetArgString(Item, "entityName")
     If Not EntityExists(Name)
-      ProcedureReturn "Erreur : entite inconnue '" + Name + "'. Observation non ajoutee."
+      ProcedureReturn ToolFail("Erreur : entite inconnue '" + Name + "'. Observation non ajoutee.")
     EndIf
     Protected Contents.i = GetArgArray(Item, "contents")
     If Contents And JSONType(Contents) = #PB_JSON_Array
@@ -292,7 +292,7 @@ EndProcedure
 Procedure.s ToolDeleteEntities(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "entityNames")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'entityNames' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'entityNames' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i, Deleted.i = 0
@@ -313,14 +313,14 @@ EndProcedure
 Procedure.s ToolDeleteObservations(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "observations")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'observations' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'observations' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i, Deleted.i = 0
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
-      ProcedureReturn "Erreur : chaque observation doit etre un objet {entityName, contents}."
+      ProcedureReturn ToolFail("Erreur : chaque observation doit etre un objet {entityName, contents}.")
     EndIf
     Protected Name.s = GetArgString(Item, "entityName")
     Protected Contents.i = GetArgArray(Item, "contents")
@@ -345,14 +345,14 @@ EndProcedure
 Procedure.s ToolDeleteRelations(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "relations")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'relations' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'relations' doit etre un tableau.")
   EndIf
 
   Protected n.i = JSONArraySize(Arr), i.i, Deleted.i = 0
   For i = 0 To n - 1
     Protected Item.i = GetJSONElement(Arr, i)
     If JSONType(Item) <> #PB_JSON_Object
-      ProcedureReturn "Erreur : chaque relation doit etre un objet {from, to, relationType}."
+      ProcedureReturn ToolFail("Erreur : chaque relation doit etre un objet {from, to, relationType}.")
     EndIf
     Protected From.s = GetArgString(Item, "from")
     Protected Dest.s = GetArgString(Item, "to")
@@ -376,13 +376,13 @@ Procedure.s ToolReadGraph()
     Wend
     FinishDatabaseQuery(G_MemDB)
   EndIf
-  ProcedureReturn BuildGraphJSON(Names())
+  ProcedureReturn ToolOk(BuildGraphJSON(Names()))
 EndProcedure
 
 ; search_nodes : query (LIKE insensible a la casse sur nom/type/contenu)
 Procedure.s ToolSearchNodes(Query.s)
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : 'query' ne peut pas etre vide."
+    ProcedureReturn ToolFail("Erreur : 'query' ne peut pas etre vide.")
   EndIf
   Protected Like.s = "'%" + ReplaceString(Query, "'", "''") + "%'"
 
@@ -396,14 +396,14 @@ Procedure.s ToolSearchNodes(Query.s)
     Wend
     FinishDatabaseQuery(G_MemDB)
   EndIf
-  ProcedureReturn BuildGraphJSON(Names())
+  ProcedureReturn ToolOk(BuildGraphJSON(Names()))
 EndProcedure
 
 ; open_nodes : names[] -> entites + relations internes
 Procedure.s ToolOpenNodes(ArgsObj.i)
   Protected Arr.i = GetArgArray(ArgsObj, "names")
   If Arr = 0 Or JSONType(Arr) <> #PB_JSON_Array
-    ProcedureReturn "Erreur : 'names' doit etre un tableau."
+    ProcedureReturn ToolFail("Erreur : 'names' doit etre un tableau.")
   EndIf
 
   NewList Names.s()
@@ -415,7 +415,7 @@ Procedure.s ToolOpenNodes(ArgsObj.i)
       Names() = GetJSONString(Val)
     EndIf
   Next
-  ProcedureReturn BuildGraphJSON(Names())
+  ProcedureReturn ToolOk(BuildGraphJSON(Names()))
 EndProcedure
 
 ; ---------------------------------------------------------------------------

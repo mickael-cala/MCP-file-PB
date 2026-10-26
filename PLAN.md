@@ -5,21 +5,22 @@
 | Phase | Sujet | Statut | Livrables |
 |---|---|---|---|
 | **0** | Infrastructure commune et harnais de test | ✅ Terminée | `mcp_common/` (stdio, logging, json_helpers, protocol, jsonrpc, http), `tests/mcp_client.py`, `tests/unit_test.pbi`, `run_all.bat/.sh`, serveur de démo `examples/minimal_server.pb` |
-| **1** | Memory (SQLite) | ✅ Terminée | `memoryMCP` (9 outils), 33 tests unitaires, 18 tests d'intégration |
+| **1** | Memory (SQLite) | ✅ Terminée | `memoryMCP` (9 outils), 33 tests unitaires, 20 tests d'intégration |
 | **2** | Database (SQLite + PostgreSQL) | ✅ Terminée | `dbMCP` (5 outils, garde-fou lecture seule, PostgreSQL optionnel), 37 tests unitaires, 12 tests d'intégration |
 | **3** | Context7 | ✅ Terminée | `context7MCP` (2 outils), WinHTTP + en-têtes, 19 tests unitaires, 7 tests d'intégration (live conditionnel) |
 | **4** | Git | ✅ Terminée | `gitMCP` (7 outils, validation anti-injection), 24 tests unitaires, 12 tests d'intégration |
 | **5** | GitHub | ✅ Terminée | `githubMCP` (10 outils, `confirm=true`, mock local), 40 tests unitaires, 25 tests d'intégration |
 | **6** | Consolidation et tests transverses | ✅ Terminée | `tests/test_robustness.py` (17 vérifications T6.1–T6.14), rapport HTML par serveur, `examples/mcp.json` |
+| **7** | Durcissement (suite à audit) | ✅ Terminée | Anti-SSRF par résolution DNS (`net_guard.pbi`), redirections bornées et revalidées, `delete_file` non récursif par défaut, refus des binaires en lecture, `isError` explicite (`ToolOk`/`ToolFail`), conformité JSON-RPC (notifications, -32601, -32602), tests de non-régression |
 
 ## Définition de « terminé » (état actuel)
 
 | Critère | État |
 |---|---|
-| Tests unitaires des modules et serveurs | ✅ 24 + 33 + 37 + 19 + 24 + 40 = **177** (Windows et Linux) |
-| Tests d'intégration (8 serveurs) | ✅ **100/100** |
+| Tests unitaires des modules et serveurs | ✅ 42 + 33 + 37 + 19 + 24 + 40 = **195** (Windows et Linux) |
+| Tests d'intégration (8 serveurs) | ✅ **121/121** |
 | `run_all.bat` / `run_all.sh` vert | ✅ **10/10 étapes** |
-| Erreurs MCP en `isError: true` avec message clair | ✅ heuristique `DetectIsError` + refus explicites |
+| Erreurs MCP en `isError: true` avec message clair | ✅ état explicite `ToolOk`/`ToolFail` + heuristique de premier recours limitée à la première ligne |
 | Aucun secret loggé ni renvoyé | ✅ tokens/clés jamais inclus dans les réponses ; logs stderr |
 | Documentation README complète | ✅ (outils, env, build, tests, config client) |
 | Release publiée | ✅ v1.0.0 (tag + binaires Windows + SHA256SUMS) |
@@ -32,16 +33,16 @@
 
 | Serveur | Outils | Tests unitaires | Tests d'intégration | Documentation |
 |---|---|---|---|---|
-| `fileMCP` | 10 | — (intégration) | 17 | README, SECURITY |
-| `MCP-Fetch-PB` | 1 | — (intégration) | 3 | README |
+| `fileMCP` | 10 | — (intégration) | 31 | README, SECURITY |
+| `MCP-Fetch-PB` | 1 | — (intégration) | 8 | README |
 | `MCP-SequentialThinking-PB` | 1 | — (intégration) | 6 | README |
-| `memoryMCP` | 9 | 33 | 18 | README, SECURITY, ERRATA |
+| `memoryMCP` | 9 | 33 | 20 | README, SECURITY, ERRATA |
 | `dbMCP` | 5 | 37 | 12 | README, SECURITY, ERRATA |
 | `context7MCP` | 2 | 19 | 7 | README, SECURITY, ERRATA |
 | `gitMCP` | 7 | 24 | 12 | README, SECURITY, ERRATA |
 | `githubMCP` | 10 | 40 | 25 | README, SECURITY, ERRATA |
 
-Total : **45 outils**, **177 tests unitaires**, **100 tests d'intégration**.
+Total : **45 outils**, **195 tests unitaires**, **121 tests d'intégration**.
 Les serveurs sans `*_core.pbi` (Fetch, SequentialThinking) sont couverts par
 l'intégration, sans suite unitaire dédiée.
 
@@ -75,7 +76,8 @@ l'intégration, sans suite unitaire dédiée.
 ### Phase 3 — Context7 (terminée)
 - Outils : `resolve_library_id` (sans clé), `query_docs` (`MCP_CONTEXT7_API_KEY`).
 - API réelle : GET (le POST renvoie 405) ; 400 trompeur sans clé intercepté.
-- HTTP : WinHTTP sous Windows, HTTP intégré ailleurs (clé non supportée).
+- HTTP : WinHTTP sous Windows ; curl sous Linux/macOS (en-têtes
+  `Authorization` supportées, `curl` requis).
 - Tests : T3.1–T3.2 live (skip hors ligne), T3.4/T3.5 (clé absente/invalide),
   T3.8 (`max_length`), plus 19 tests unitaires hors ligne.
 

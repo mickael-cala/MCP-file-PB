@@ -72,13 +72,20 @@ EndProcedure
 ; peuvent aussi lever *IsError\i directement dans le dispatch.
 ; ---------------------------------------------------------------------------
 Procedure.i DetectIsError(OutputStr.s)
-  If OutputStr = "ACCES_REFUSE"
+  ; Heuristique de DERNIER RECOURS uniquement : premiere ligne, courte, pour ne
+  ; jamais inspecter un payload de resultat (JSON, listing, contenu de fichier).
+  Protected FirstLine.s = OutputStr
+  Protected NL.i = FindString(FirstLine, #LF$)
+  If NL > 0 : FirstLine = Left(FirstLine, NL - 1) : EndIf
+  If Len(FirstLine) > 300 : FirstLine = Left(FirstLine, 300) : EndIf
+
+  If FirstLine = "ACCES_REFUSE"
     ProcedureReturn #True
   EndIf
-  If FindString(OutputStr, "Erreur") = 1 Or FindString(OutputStr, "ERREUR") = 1 Or FindString(OutputStr, "Impossible") = 1 Or FindString(OutputStr, "Echec") = 1
+  If FindString(FirstLine, "Erreur") = 1 Or FindString(FirstLine, "ERREUR") = 1 Or FindString(FirstLine, "Impossible") = 1 Or FindString(FirstLine, "Echec") = 1
     ProcedureReturn #True
   EndIf
-  If FindString(OutputStr, "introuvable") > 0 Or FindString(OutputStr, "refusee") > 0 Or FindString(OutputStr, "depasse") > 0
+  If FindString(FirstLine, "introuvable") > 0 Or FindString(FirstLine, "refusee") > 0 Or FindString(FirstLine, "depasse") > 0
     ProcedureReturn #True
   EndIf
   ProcedureReturn #False
@@ -109,8 +116,17 @@ Procedure ProcessRequest(Line.s)
 
   Protected IdMember.i = GetJSONMember(RootVal, "id")
 
-  ; Notifications : pas de reponse attendue
-  If Method = "notifications/initialized"
+  ; Une requete sans "method" textuelle n'est pas un objet Request valide.
+  If Method = ""
+    FreeJSON(ReqJSON)
+    SendRawError(#Null, -32600, "Invalid Request: missing method")
+    ProcedureReturn
+  EndIf
+
+  ; JSON-RPC 2.0 : toute requete SANS "id" est une notification. Aucune reponse
+  ; ne doit etre emise, quelle que soit l'issue du traitement (y compris
+  ; notifications/initialized, tools/list et tools/call).
+  If IdMember = 0
     FreeJSON(ReqJSON)
     ProcedureReturn
   EndIf
@@ -125,7 +141,10 @@ Procedure ProcessRequest(Line.s)
     Protected IdValStr.s = "null"
     If IdMember
       If JSONType(IdMember) = #PB_JSON_String
-        IdValStr = Chr(34) + GetJSONString(IdMember) + Chr(34)
+        Protected IdRaw.s = GetJSONString(IdMember)
+        IdRaw = ReplaceString(IdRaw, Chr(92), Chr(92) + Chr(92))
+        IdRaw = ReplaceString(IdRaw, Chr(34), Chr(92) + Chr(34))
+        IdValStr = Chr(34) + IdRaw + Chr(34)
       ElseIf JSONType(IdMember) = #PB_JSON_Number
         IdValStr = Str(GetJSONInteger(IdMember))
       EndIf
@@ -178,8 +197,17 @@ Procedure ProcessRequest(Line.s)
         ArgsMember = GetJSONMember(ParamsMember, "arguments")
       EndIf
 
+      ; Parametres invalides : erreur JSON-RPC normalisee (-32602).
+      If ToolName = ""
+        FreeJSON(RespJSON)
+        SendRawError(IdMember, -32602, "Invalid params: missing tool name")
+        FreeJSON(ReqJSON)
+        ProcedureReturn
+      EndIf
+
       Protected OutputStr.s = ""
       Protected IsErr.i = #False
+      ToolStateReset()
       If *G_ToolHandler
         OutputStr = *G_ToolHandler(ToolName, ArgsMember, @IsErr)
       Else
@@ -190,14 +218,25 @@ Procedure ProcessRequest(Line.s)
       If OutputStr = "ACCES_REFUSE"
         OutputStr = "Erreur : Acces refuse en dehors de la zone autorisee."
       EndIf
-      If DetectIsError(OutputStr)
+
+      ; Priorite a l'etat explicite fourni par l'outil ; heuristique seulement
+      ; si l'outil n'a rien declare.
+      If G_ToolState < 0
+        IsErr = #True
+      ElseIf G_ToolState > 0
+        IsErr = #False
+      ElseIf Not IsErr And DetectIsError(OutputStr)
         IsErr = #True
       EndIf
 
       AttachResultPayload(ResultObj, OutputStr, IsErr)
 
     Default
-      ; Autres methodes : resultat vide
+      ; Methode inconnue : erreur JSON-RPC normalisee
+      FreeJSON(RespJSON)
+      SendRawError(IdMember, -32601, "Method not found")
+      FreeJSON(ReqJSON)
+      ProcedureReturn
   EndSelect
 
   SendResponse(RespJSON)

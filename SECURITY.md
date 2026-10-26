@@ -15,14 +15,23 @@ Le dépôt contient 8 serveurs MCP, chacun avec ses garde-fous :
 
 | Serveur | Surface | Protections |
 |---|---|---|
-| `fileMCP` | Système de fichiers | Confinement à `MCP_ROOT`, normalisation des chemins (traversées `..` refusées), `change_root` protégé par `MCP_ROOT_SECRET` |
+| `fileMCP` | Système de fichiers | Confinement à `MCP_ROOT`, normalisation des chemins (traversées `..` refusées), suppression récursive uniquement sur `recursive=true`, binaires refusés en lecture, `change_root` protégé par `MCP_ROOT_SECRET` |
 | `memoryMCP` | Base SQLite | Échappement SQL (apostrophes doublées), FK en cascade, base locale (`MCP_MEMORY_DB`) |
 | `dbMCP` | Bases SQL | **Lecture seule par défaut** (`IsReadOnlyQuery`), écritures uniquement avec `MCP_DB_ALLOW_WRITE=1`, refus journalisés |
 | `context7MCP` | API web | HTTP/HTTPS uniquement, clé API jamais loggée (WinHTTP/curl) |
 | `gitMCP` | Sous-processus git | `GitSafeParam` rejette les métacaractères shell sur tous les paramètres, aucune commande exécutée sans validation |
 | `githubMCP` | API GitHub | Écritures exigeant `confirm=true`, token jamais renvoyé ni loggé, pagination bornée, validation des segments d'URL (WinHTTP/curl) |
-| `MCP-Fetch-PB` | API web | HTTP/HTTPS uniquement, hôtes privés/loopback refusés (anti-SSRF) |
+| `MCP-Fetch-PB` | API web | HTTP/HTTPS uniquement, hôte résolu et **toutes** ses adresses validées (refus privé/loopback/link-local/CGNAT/multicast/ULA/IPv4-mappée, fail-closed), redirections non suivies automatiquement (3 sauts maximum, chaque cible revalidée) |
 | `MCP-SequentialThinking-PB` | État local | Aucune I/O externe |
+
+### Validation réseau (anti-SSRF)
+
+`MCP-Fetch-PB` ne juge jamais un hôte sur sa chaîne : il le résout via
+`getaddrinfo` et refuse la requête si **une seule** adresse retournée est non
+globale. Une résolution impossible est un refus. Les redirections sont
+désactivées au niveau du client HTTP (WinHTTP `DISABLE_REDIRECTS`, curl sans
+`-L`) puis suivies manuellement : 3 sauts maximum, chaque cible repassant par
+la même validation avant toute connexion.
 
 ## Secrets et variables d'environnement
 

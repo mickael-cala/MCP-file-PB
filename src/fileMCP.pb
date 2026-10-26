@@ -199,13 +199,16 @@ Procedure.s ToolListFiles(Path.s)
     Wend
     FinishDirectory(Dir)
   EndIf
-  ProcedureReturn SafePath + " (" + Str(Count) + " elements) :" + #LF$ + Res
+  ProcedureReturn ToolOk(SafePath + " (" + Str(Count) + " elements) :" + #LF$ + Res)
 EndProcedure
 
 Procedure.s ToolReadFile(Path.s)
   Protected SafePath.s = ValiderChemin(Path)
-  If SafePath = "" : ProcedureReturn "ACCES_REFUSE" : EndIf
-  If FileSize(SafePath) < 0 : ProcedureReturn "Fichier introuvable : " + Path : EndIf
+  If SafePath = "" : ProcedureReturn ToolFail("ACCES_REFUSE") : EndIf
+  If IsBinaryFile(SafePath)
+    ProcedureReturn ToolFail("Erreur : fichier binaire refuse (extension ." + LCase(GetExtensionPart(SafePath)) + ").")
+  EndIf
+  If FileSize(SafePath) < 0 : ProcedureReturn ToolFail("Fichier introuvable : " + Path) : EndIf
 
   Protected FileNum.i = ReadFile(#PB_Any, SafePath)
   If Not FileNum : ProcedureReturn "Impossible d'ouvrir le fichier : " + Path : EndIf
@@ -231,14 +234,17 @@ Procedure.s ToolReadFile(Path.s)
   If Truncated
     Content + #LF$ + "[... Tronque au-dela de 20000 octets ...]"
   EndIf
-  ProcedureReturn Content
+  ProcedureReturn ToolOk(Content)
 EndProcedure
 
 Procedure.s ToolReadFileLines(Path.s, StartLine.i, MaxLines.i)
   Protected SafePath.s = ValiderChemin(Path)
-  If SafePath = "" : ProcedureReturn "ACCES_REFUSE" : EndIf
-  If FileSize(SafePath) < 0 : ProcedureReturn "Fichier introuvable : " + Path : EndIf
-  If FileSize(SafePath) > 5 * 1024 * 1024 : ProcedureReturn "Fichier depasse la limite de 5 Mo." : EndIf
+  If SafePath = "" : ProcedureReturn ToolFail("ACCES_REFUSE") : EndIf
+  If IsBinaryFile(SafePath)
+    ProcedureReturn ToolFail("Erreur : fichier binaire refuse (extension ." + LCase(GetExtensionPart(SafePath)) + ").")
+  EndIf
+  If FileSize(SafePath) < 0 : ProcedureReturn ToolFail("Fichier introuvable : " + Path) : EndIf
+  If FileSize(SafePath) > 5 * 1024 * 1024 : ProcedureReturn ToolFail("Fichier depasse la limite de 5 Mo.") : EndIf
 
   Protected FileNum.i = ReadFile(#PB_Any, SafePath)
   If Not FileNum : ProcedureReturn "Impossible d'ouvrir le fichier : " + Path : EndIf
@@ -260,7 +266,7 @@ Procedure.s ToolReadFileLines(Path.s, StartLine.i, MaxLines.i)
   Wend
 
   CloseFile(FileNum)
-  ProcedureReturn Res
+  ProcedureReturn ToolOk(Res)
 EndProcedure
 
 Procedure.s ToolWriteFile(Path.s, Content.s)
@@ -283,28 +289,55 @@ Procedure.s ToolCreateDirectory(Path.s)
   If NativeCreateDirectories(SafePath)
     ProcedureReturn "Repertoire cree : " + SafePath
   Else
-    ProcedureReturn "Impossible de creer le repertoire : " + SafePath
+    ProcedureReturn ToolFail("Impossible de creer le repertoire : " + SafePath)
   EndIf
 EndProcedure
 
-Procedure.s ToolDeleteFile(Path.s)
+; Vrai si le dossier ne contient aucune entree (hors . et ..).
+Procedure.i IsDirectoryEmpty(Path.s)
+  Protected Dir.i = ExamineDirectory(#PB_Any, Path, "*")
+  If Not Dir : ProcedureReturn #False : EndIf
+  Protected Empty.i = #True
+  While NextDirectoryEntry(Dir)
+    Protected Entry.s = DirectoryEntryName(Dir)
+    If Entry <> "." And Entry <> ".."
+      Empty = #False
+      Break
+    EndIf
+  Wend
+  FinishDirectory(Dir)
+  ProcedureReturn Empty
+EndProcedure
+
+; Suppression NON recursive par defaut ; recursive=#True pour un dossier non vide.
+Procedure.s ToolDeleteFile(Path.s, Recursive.i)
   Protected SafePath.s = ValiderChemin(Path)
-  If SafePath = "" : ProcedureReturn "ACCES_REFUSE" : EndIf
+  If SafePath = "" : ProcedureReturn ToolFail("ACCES_REFUSE") : EndIf
 
   If FileSize(SafePath) = -2
-    If DeleteDirectory(SafePath, "", #PB_FileSystem_Recursive)
+    If Recursive
+      If DeleteDirectory(SafePath, "", #PB_FileSystem_Recursive)
+        ProcedureReturn "Dossier supprime (recursif) : " + SafePath
+      Else
+        ProcedureReturn ToolFail("Impossible de supprimer le dossier : " + SafePath)
+      EndIf
+    EndIf
+    If Not IsDirectoryEmpty(SafePath)
+      ProcedureReturn ToolFail("Erreur : dossier non vide (utiliser recursive=true) : " + SafePath)
+    EndIf
+    If DeleteDirectory(SafePath, "", 0)
       ProcedureReturn "Dossier supprime : " + SafePath
     Else
-      ProcedureReturn "Impossible de supprimer le dossier : " + SafePath
+      ProcedureReturn ToolFail("Impossible de supprimer le dossier : " + SafePath)
     EndIf
   ElseIf FileSize(SafePath) >= 0
     If DeleteFile(SafePath)
       ProcedureReturn "Fichier supprime : " + SafePath
     Else
-      ProcedureReturn "Impossible de supprimer le fichier : " + SafePath
+      ProcedureReturn ToolFail("Impossible de supprimer le fichier : " + SafePath)
     EndIf
   EndIf
-  ProcedureReturn "Cible introuvable : " + SafePath
+  ProcedureReturn ToolFail("Cible introuvable : " + SafePath)
 EndProcedure
 
 Procedure.s ToolMoveFile(OldPath.s, NewPath.s)
@@ -321,7 +354,7 @@ Procedure.s ToolMoveFile(OldPath.s, NewPath.s)
       ProcedureReturn "Fichier deplace (copie/suppression) : " + SafeOld + " -> " + SafeNew
     EndIf
   EndIf
-  ProcedureReturn "Echec du deplacement de " + SafeOld + " vers " + SafeNew
+  ProcedureReturn ToolFail("Echec du deplacement de " + SafeOld + " vers " + SafeNew)
 EndProcedure
 
 Procedure.s ToolGetFileInfo(Path.s)
@@ -343,7 +376,7 @@ Procedure.s ToolGetFileInfo(Path.s)
   Res + "Taille : " + Str(Size) + " octets" + #LF$
   Res + "Horodatage : " + DateText + #LF$
   Res + "Est un dossier : " + IsDir
-  ProcedureReturn Res
+  ProcedureReturn ToolOk(Res)
 EndProcedure
 
 Procedure SearchRecursive(BaseDir.s, Pattern.s, List Matches.s(), *Count.Integer)
@@ -396,18 +429,18 @@ Procedure.s ToolSearchFiles(Path.s, Pattern.s)
   ForEach Matches()
     Res + Matches() + #LF$
   Next
-  ProcedureReturn Res
+  ProcedureReturn ToolOk(Res)
 EndProcedure
 
 Procedure.s ToolChangeRoot(NewRoot.s, Secret.s)
   If G_RootSecret = ""
-    ProcedureReturn "Modification refusee : MCP_ROOT_SECRET non configure cote serveur."
+    ProcedureReturn ToolFail("Modification refusee : MCP_ROOT_SECRET non configure cote serveur.")
   EndIf
   If Secret <> G_RootSecret
-    ProcedureReturn "Modification refusee : secret invalide."
+    ProcedureReturn ToolFail("Modification refusee : secret invalide.")
   EndIf
   If FileSize(NewRoot) <> -2
-    ProcedureReturn "Repertoire introuvable : " + NewRoot
+    ProcedureReturn ToolFail("Repertoire introuvable : " + NewRoot)
   EndIf
 
   G_AllowedRoot = NormalizePath(NewRoot)
@@ -429,7 +462,7 @@ Procedure.i BuildToolsCatalog()
   ToolDef(ToolsArr, "read_file_lines", "Lire une plage de lignes (fichier limite a 5 Mo)", "path|string|Chemin;startLine|integer|Ligne de depart (defaut:1);maxLines|integer|Nombre de lignes (defaut:50)", "path")
   ToolDef(ToolsArr, "write_file", "Ecrire/creer un fichier texte", "path|string|Chemin;content|string|Contenu", "path;content")
   ToolDef(ToolsArr, "create_directory", "Creer un repertoire", "path|string|Chemin", "path")
-  ToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou dossier", "path|string|Chemin", "path")
+  ToolDef(ToolsArr, "delete_file", "Supprimer un fichier ou un dossier (vide par defaut ; recursive=true pour un dossier non vide)", "path|string|Chemin;recursive|boolean|Supprimer recursivement un dossier non vide (defaut: false)", "path")
   ToolDef(ToolsArr, "move_file", "Deplacer ou renommer un fichier", "oldPath|string|Chemin source;newPath|string|Chemin destination", "oldPath;newPath")
   ToolDef(ToolsArr, "get_file_info", "Infos detaillees fichier/dossier", "path|string|Chemin", "path")
   ToolDef(ToolsArr, "search_files", "Rechercher du texte (recursif)", "path|string|Repertoire de depart;pattern|string|Texte recherche", "path;pattern")
@@ -454,7 +487,7 @@ Procedure.s ToolDispatch(ToolName.s, ArgsObj.i, *IsError.Integer)
     Case "create_directory"
       ProcedureReturn ToolCreateDirectory(GetArgString(ArgsObj, "path"))
     Case "delete_file"
-      ProcedureReturn ToolDeleteFile(GetArgString(ArgsObj, "path"))
+      ProcedureReturn ToolDeleteFile(GetArgString(ArgsObj, "path"), GetArgBool(ArgsObj, "recursive", #False))
     Case "move_file"
       ProcedureReturn ToolMoveFile(GetArgString(ArgsObj, "oldPath"), GetArgString(ArgsObj, "newPath"))
     Case "get_file_info"
@@ -465,7 +498,7 @@ Procedure.s ToolDispatch(ToolName.s, ArgsObj.i, *IsError.Integer)
       ProcedureReturn ToolChangeRoot(GetArgString(ArgsObj, "newRoot"), GetArgString(ArgsObj, "secret"))
     Default
       *IsError\i = #True
-      ProcedureReturn "Outil inconnu : " + ToolName
+      ProcedureReturn ToolFail("Outil inconnu : " + ToolName)
   EndSelect
 EndProcedure
 

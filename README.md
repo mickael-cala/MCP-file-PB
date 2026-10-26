@@ -19,7 +19,8 @@ Caractéristiques communes :
 
 - **Multi-plateforme** : Windows, Linux, macOS (sélection E/S stdio par directives `CompilerIf`).
 - **Transport stdio** : chaque message JSON-RPC est émis sur une seule ligne, délimité par `\n`.
-- **Zéro dépendance** : compilables avec PureBasic seul, aucune DLL/API externe.
+- **Zéro dépendance applicative** : compilables avec PureBasic seul (sous
+  Linux/macOS, les serveurs HTTP réclament `curl`, utilisé comme client HTTP).
 
 ## Outils MCP exposés
 
@@ -28,11 +29,11 @@ Caractéristiques communes :
 | Outil | Description | Paramètres |
 |---|---|---|
 | `list_files` | Lister le contenu d'un répertoire (confiné à la racine autorisée) | `path` |
-| `read_file` | Lire un fichier texte (tronqué au-delà de 20 000 octets) | `path` |
-| `read_file_lines` | Lire une plage de lignes (fichier limité à 5 Mo) | `path`, `startLine` (défaut 1), `maxLines` (défaut 50) |
+| `read_file` | Lire un fichier texte (binaires refusés, tronqué au-delà de 20 000 octets) | `path` |
+| `read_file_lines` | Lire une plage de lignes (binaires refusés, fichier limité à 5 Mo) | `path`, `startLine` (défaut 1), `maxLines` (défaut 50) |
 | `write_file` | Écrire/créer un fichier texte | `path`, `content` |
 | `create_directory` | Créer un répertoire | `path` |
-| `delete_file` | Supprimer un fichier ou dossier vide ⚠️ | `path` |
+| `delete_file` | Supprimer un fichier ou un dossier **vide** ⚠️ (`recursive=true` pour un dossier non vide) | `path`, `recursive` (défaut false) |
 | `move_file` | Déplacer ou renommer un fichier ⚠️ | `oldPath`, `newPath` |
 | `get_file_info` | Infos détaillées fichier/dossier | `path` |
 | `search_files` | Rechercher du texte (récursif) | `path`, `pattern` |
@@ -44,7 +45,7 @@ Caractéristiques communes :
 |---|---|---|
 | `fetch` | Récupère une URL et retourne son contenu en Markdown (ou HTML brut si `raw=true`) | `url`, `max_length` (défaut 5000), `start_index` (défaut 0), `raw` (défaut false) |
 
-Les URLs non HTTP/HTTPS et les IPs littérales sont refusées (SSRF) ; un timeout plafonne la durée de chaque requête.
+Anti-SSRF : l'URL doit être en HTTP/HTTPS, l'hôte est **résolu** et **toutes** ses adresses doivent être publiques (refus des plages privées, loopback, link-local, CGNAT, multicast, ULA IPv6, IPv4-mappée) ; toute résolution impossible est un refus. Les redirections ne sont jamais suivies automatiquement : 3 sauts maximum, chaque cible révalidée avant connexion. Un timeout plafonne la durée de chaque requête.
 
 ### MCP-SequentialThinking-PB — raisonnement séquentiel
 
@@ -188,11 +189,11 @@ run_all.bat        # ou ./run_all.sh : tout verifier
 ```
 
 - **Unitaires (PureBasic)** : `tests/unit_test.pbi` (micro-framework) +
-  6 suites (`tests/test_common.pb` 24, `test_memory.pb` 33, `test_database.pb`
+  6 suites (`tests/test_common.pb` 42, `test_memory.pb` 33, `test_database.pb`
   37, `test_context7.pb` 19, `test_git.pb` 24, `test_github.pb` 40 — soit
-  177 tests/hors réseau). Chaque futur module ajoute un `tests/test_<module>.pb`.
+  195 tests/hors réseau). Chaque futur module ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
-  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (100 tests qui
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (121 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
@@ -200,7 +201,7 @@ python tests/test_mcp.py                          # les 8 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-100 tests au total (PostgreSQL conditionnel, Context7 live hors ligne,
+121 tests au total (PostgreSQL conditionnel, Context7 live hors ligne,
 GitHub via mock local). Validés sous **Windows et Linux (WSL2)**.
 
 - **Robustesse et performances (Phase 6)** : `tests/test_robustness.py` —
@@ -276,7 +277,9 @@ Chaque serveur démarre, attend les requêtes JSON-RPC sur stdin, et se termine 
 mcp_common/               Modules partages par tous les serveurs MCP
 ├── stdio.pbi             Couche E/S stdio multi-OS (stdin bufferise, stdout/stderr)
 ├── logging.pbi           LogDebug/LogError sur stderr (jamais sur stdout)
-├── json_helpers.pbi      Lecture d'arguments + construction de schemas d'outils
+├── json_helpers.pbi      Lecture d'arguments + schemas + etat ToolOk/ToolFail
+├── http.pbi              HTTP GET/POST avec en-tetes (WinHTTP / curl)
+├── net_guard.pbi         Anti-SSRF : resolution DNS + plages publiques
 ├── protocol.pbi          Identite serveur + reponse initialize
 └── jsonrpc.pbi           Noyau JSON-RPC 2.0 generique (hooks + MCPMainLoop)
 
@@ -304,9 +307,9 @@ run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapp
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
 ├── mock_github.py          # Mock local de l'API GitHub (integration)
-├── test_mcp.py             # Tests fonctionnels des 8 serveurs (100 tests)
+├── test_mcp.py             # Tests fonctionnels des 8 serveurs (121 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
-├── test_common.pb          # Tests unitaires des modules mcp_common (24 tests)
+├── test_common.pb          # Tests unitaires des modules mcp_common (42 tests)
 ├── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
 ├── test_database.pb        # Tests unitaires du serveur Database (37 tests)
 ├── test_context7.pb        # Tests unitaires du serveur Context7 (19 tests)

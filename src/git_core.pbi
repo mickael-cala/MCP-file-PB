@@ -150,7 +150,7 @@ Procedure.s GitFailText(*R.GitResult, Action.s)
   ElseIf Trim(*R\ErrText) <> ""
     Msg + #LF$ + Trim(*R\ErrText)
   EndIf
-  ProcedureReturn Msg
+  ProcedureReturn ToolFail(Msg)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ EndProcedure
 Procedure.s GitCheckRepoParam(RepoPath.s)
   If Not GitSafeParam(RepoPath)
     LogError("repoPath refuse (caracteres dangereux) : " + Left(RepoPath, 80))
-    ProcedureReturn "Erreur : repoPath contient des caracteres interdits (; & | < > ` $ ( ) ' retours ligne)."
+    ProcedureReturn ToolFail("Erreur : repoPath contient des caracteres interdits (; & | < > ` $ ( ) ' retours ligne).")
   EndIf
   ProcedureReturn ""
 EndProcedure
@@ -191,7 +191,7 @@ Procedure.s ToolGitStatus(RepoPath.s)
   If Trim(Result\Output) = ""
     ProcedureReturn "Working tree clean (aucune modification)."
   EndIf
-  ProcedureReturn TrimOut(Result\Output)
+  ProcedureReturn ToolOk(TrimOut(Result\Output))
 EndProcedure
 
 ; git_log (count limite et borne 1..1000)
@@ -205,7 +205,7 @@ Procedure.s ToolGitLog(RepoPath.s, Count.i)
   If Result\ExitCode <> 0
     ProcedureReturn GitFailText(@Result, "git log a echoue")
   EndIf
-  ProcedureReturn TrimOut(Result\Output)
+  ProcedureReturn ToolOk(TrimOut(Result\Output))
 EndProcedure
 
 ; git_diff (refs A et B, chemin optionnel)
@@ -213,10 +213,10 @@ Procedure.s ToolGitDiff(RepoPath.s, RefA.s, RefB.s, Path.s)
   Protected Bad.s = GitCheckRepoParam(RepoPath)
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GitSafeParam(RefA) Or Not GitSafeParam(RefB) Or Not GitSafeParam(Path)
-    ProcedureReturn "Erreur : refA/refB/path contiennent des caracteres interdits."
+    ProcedureReturn ToolFail("Erreur : refA/refB/path contiennent des caracteres interdits.")
   EndIf
   If RefA = "" Or RefB = ""
-    ProcedureReturn "Erreur : refA et refB sont requis."
+    ProcedureReturn ToolFail("Erreur : refA et refB sont requis.")
   EndIf
   Protected DiffArgs.s = "diff " + GitQuote(RefA) + " " + GitQuote(RefB)
   If Path <> ""
@@ -230,7 +230,7 @@ Procedure.s ToolGitDiff(RepoPath.s, RefA.s, RefB.s, Path.s)
   If Trim(Result\Output) = ""
     ProcedureReturn "(pas de difference)"
   EndIf
-  ProcedureReturn TrimOut(Result\Output)
+  ProcedureReturn ToolOk(TrimOut(Result\Output))
 EndProcedure
 
 ; git_show (contenu d'un fichier a une ref : "ref:path")
@@ -238,17 +238,17 @@ Procedure.s ToolGitShow(RepoPath.s, Ref.s, Path.s)
   Protected Bad.s = GitCheckRepoParam(RepoPath)
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GitSafeParam(Ref) Or Not GitSafeParam(Path)
-    ProcedureReturn "Erreur : ref/path contiennent des caracteres interdits."
+    ProcedureReturn ToolFail("Erreur : ref/path contiennent des caracteres interdits.")
   EndIf
   If Ref = "" Or Path = ""
-    ProcedureReturn "Erreur : ref et path sont requis."
+    ProcedureReturn ToolFail("Erreur : ref et path sont requis.")
   EndIf
   Protected Result.GitResult
   GitRun(RepoPath, "show " + GitQuote(Ref + ":" + Path), @Result)
   If Result\ExitCode <> 0
     ProcedureReturn GitFailText(@Result, "git show a echoue (ref ou fichier inexistant ?)")
   EndIf
-  ProcedureReturn TrimOut(Result\Output)
+  ProcedureReturn ToolOk(TrimOut(Result\Output))
 EndProcedure
 
 ; git_branches (locales, ou remotes avec remote=true)
@@ -272,7 +272,7 @@ Procedure.s ToolGitBranches(RepoPath.s, Remote.i)
     If Left(L, 2) = "* " : L = Mid(L, 3) : EndIf
     If L <> "" : Out + L + #LF$ : EndIf
   Next
-  ProcedureReturn TrimOut(Out)
+  ProcedureReturn ToolOk(TrimOut(Out))
 EndProcedure
 
 ; git_blame (plage de lignes 1..100000)
@@ -280,10 +280,10 @@ Procedure.s ToolGitBlame(RepoPath.s, Path.s, StartLine.i, EndLine.i)
   Protected Bad.s = GitCheckRepoParam(RepoPath)
   If Bad <> "" : ProcedureReturn Bad : EndIf
   If Not GitSafeParam(Path)
-    ProcedureReturn "Erreur : path contient des caracteres interdits."
+    ProcedureReturn ToolFail("Erreur : path contient des caracteres interdits.")
   EndIf
   If Path = ""
-    ProcedureReturn "Erreur : path est requis."
+    ProcedureReturn ToolFail("Erreur : path est requis.")
   EndIf
   If StartLine < 1 : StartLine = 1 : EndIf
   If EndLine < StartLine : EndLine = StartLine + 49 : EndIf
@@ -293,7 +293,7 @@ Procedure.s ToolGitBlame(RepoPath.s, Path.s, StartLine.i, EndLine.i)
   If Result\ExitCode <> 0
     ProcedureReturn GitFailText(@Result, "git blame a echoue (fichier ou lignes invalides ?)")
   EndIf
-  ProcedureReturn TrimOut(Result\Output)
+  ProcedureReturn ToolOk(TrimOut(Result\Output))
 EndProcedure
 
 ; ---------------------------------------------------------------------------

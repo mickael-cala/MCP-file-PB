@@ -46,10 +46,10 @@ Procedure.s ToolSequentialThinking(ArgsObj.i)
   Protected BranchId.s       = GetArgString(ArgsObj, "branchId")
 
   If Trim(Thought) = ""
-    ProcedureReturn "ERREUR: le parametre 'thought' ne peut pas etre vide."
+    ProcedureReturn ToolFail("ERREUR: le parametre 'thought' ne peut pas etre vide.")
   EndIf
   If ThoughtNum < 1
-    ProcedureReturn "ERREUR: 'thoughtNumber' doit etre un entier >= 1."
+    ProcedureReturn ToolFail("ERREUR: 'thoughtNumber' doit etre un entier >= 1.")
   EndIf
   If TotalThoughts < 1
     TotalThoughts = ThoughtNum
@@ -94,7 +94,7 @@ Procedure.s ToolSequentialThinking(ArgsObj.i)
 
   Protected Out.s = ComposeJSON(RespJSON)
   FreeJSON(RespJSON)
-  ProcedureReturn Out
+  ProcedureReturn ToolOk(Out)
 EndProcedure
 
 ; ---------------------------------------------------------------------------

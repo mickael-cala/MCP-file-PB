@@ -92,6 +92,13 @@ class MCPTestClient:
         """Envoie la notification notifications/initialized (sans reponse)."""
         self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
+    def send_notification(self, method, params=None):
+        """Envoie une notification JSON-RPC 2.0 (aucune reponse attendue)."""
+        req = {"jsonrpc": "2.0", "method": method}
+        if params is not None:
+            req["params"] = params
+        self._send(req)
+
     # ------------------------------------------------------------------
     # Envoi / reception bas niveau
     # ------------------------------------------------------------------

@@ -48,7 +48,7 @@ EndProcedure
 ; resolve_library_id : recherche de bibliotheques (fonctionne sans cle)
 Procedure.s ToolResolveLibraryId(Query.s, LibraryType.s)
   If Trim(Query) = ""
-    ProcedureReturn "Erreur : 'query' ne peut pas etre vide."
+    ProcedureReturn ToolFail("Erreur : 'query' ne peut pas etre vide.")
   EndIf
   If LibraryType = "" : LibraryType = "oss" : EndIf
 
@@ -57,19 +57,19 @@ Procedure.s ToolResolveLibraryId(Query.s, LibraryType.s)
   Protected Body.s = HttpGetHeaders(Url, "", 15, @Status)
   If Status <> 200
     Protected Err.s = C7HttpErrorText(Status, "Erreur recherche")
-    If Err <> "" : ProcedureReturn Err : EndIf
-    ProcedureReturn "Erreur recherche : reponse vide (statut " + Str(Status) + ")."
+    If Err <> "" : ProcedureReturn ToolFail(Err) : EndIf
+    ProcedureReturn ToolFail("Erreur recherche : reponse vide (statut " + Str(Status) + ").")
   EndIf
 
   Protected J.i = ParseJSON(#PB_Any, Body)
   If J = 0
-    ProcedureReturn "Erreur : reponse Context7 invalide (JSON illisible)."
+    ProcedureReturn ToolFail("Erreur : reponse Context7 invalide (JSON illisible).")
   EndIf
   Protected Root.i = JSONValue(J)
   Protected Results.i = GetJSONMember(Root, "results")
   If Results = 0 Or JSONType(Results) <> #PB_JSON_Array
     FreeJSON(J)
-    ProcedureReturn "Erreur : reponse Context7 invalide (pas de tableau 'results')."
+    ProcedureReturn ToolFail("Erreur : reponse Context7 invalide (pas de tableau 'results').")
   EndIf
 
   Protected n.i = JSONArraySize(Results)
@@ -93,13 +93,13 @@ Procedure.s ToolResolveLibraryId(Query.s, LibraryType.s)
   Next
   Res + "Utilisez query_docs avec l'id choisi (ex. /owner/repo)."
   FreeJSON(J)
-  ProcedureReturn Res
+  ProcedureReturn ToolOk(Res)
 EndProcedure
 
 ; query_docs : documentation d'une bibliotheque (cle API requise)
 Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
   If Trim(LibraryId) = ""
-    ProcedureReturn "Erreur : 'libraryId' est requis (ex. /reactjs/react.dev/latest)."
+    ProcedureReturn ToolFail("Erreur : 'libraryId' est requis (ex. /reactjs/react.dev/latest).")
   EndIf
   If Tokens <= 0 : Tokens = 5000 : EndIf
   If MaxLen <= 0 : MaxLen = 10000 : EndIf
@@ -107,7 +107,7 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
   ; Cle API requise : l'API renvoie un 400 trompeur ("invalid_format") sans
   ; en-tete Authorization -> on intercepte avant l'appel pour un message clair.
   If G_C7ApiKey = ""
-    ProcedureReturn "Erreur : MCP_CONTEXT7_API_KEY non configure. Obtenez une cle sur https://context7.com (prefixe ctx7sk) puis relancez le serveur."
+    ProcedureReturn ToolFail("Erreur : MCP_CONTEXT7_API_KEY non configure. Obtenez une cle sur https://context7.com (prefixe ctx7sk) puis relancez le serveur.")
   EndIf
 
   Protected Auth.s = "Authorization: Bearer " + G_C7ApiKey
@@ -123,13 +123,13 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
   Protected Body.s = HttpGetHeaders(Url, Auth, 20, @Status)
   If Status <> 200
     Protected Err.s = C7HttpErrorText(Status, "Erreur docs")
-    If Err <> "" : ProcedureReturn Err : EndIf
-    ProcedureReturn "Erreur docs : reponse vide (statut " + Str(Status) + ")."
+    If Err <> "" : ProcedureReturn ToolFail(Err) : EndIf
+    ProcedureReturn ToolFail("Erreur docs : reponse vide (statut " + Str(Status) + ").")
   EndIf
 
   Protected J.i = ParseJSON(#PB_Any, Body)
   If J = 0
-    ProcedureReturn "Erreur : reponse Context7 invalide (JSON illisible)."
+    ProcedureReturn ToolFail("Erreur : reponse Context7 invalide (JSON illisible).")
   EndIf
   Protected Root.i = JSONValue(J)
   Protected Content.i = GetJSONMember(Root, "content")
@@ -139,10 +139,10 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
     If Msg And JSONType(Msg) = #PB_JSON_String
       Protected AppMsg.s = GetJSONString(Msg)
       FreeJSON(J)
-      ProcedureReturn "Erreur Context7 : " + AppMsg
+      ProcedureReturn ToolFail("Erreur Context7 : " + AppMsg)
     EndIf
     FreeJSON(J)
-    ProcedureReturn "Erreur : reponse Context7 invalide (pas de 'content')."
+    ProcedureReturn ToolFail("Erreur : reponse Context7 invalide (pas de 'content').")
   EndIf
 
   Protected Text.s = GetJSONString(Content)
@@ -154,7 +154,7 @@ Procedure.s ToolQueryDocs(LibraryId.s, Query.s, Tokens.i, Topic.s, MaxLen.i)
   If TotalLen > MaxLen
     Out + #LF$ + "[Contenu : " + Str(TotalLen) + " caracteres au total ; tronque a " + Str(MaxLen) + " ; augmentez 'tokens' ou affinez 'query']"
   EndIf
-  ProcedureReturn Out
+  ProcedureReturn ToolOk(Out)
 EndProcedure
 
 ; ---------------------------------------------------------------------------
