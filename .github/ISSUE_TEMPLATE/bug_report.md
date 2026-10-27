@@ -23,7 +23,7 @@ labels: bug
 
 - OS : <!-- Windows 11, Ubuntu 24.04, macOS … -->
 - Version de PureBasic :
-- Résultat de `python tests/test_mcp.py` : <!-- 121/121 ou détails des échecs -->
+- Résultat de `python tests/test_mcp.py` : <!-- 122/122 ou détails des échecs -->
 
 ## Contexte supplémentaire
 

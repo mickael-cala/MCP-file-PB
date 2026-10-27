@@ -10,7 +10,7 @@ Huit serveurs [MCP](https://modelcontextprotocol.io) (Model Context Protocol) é
 | **MCP-Fetch-PB** | `src/MCP-Fetch-PB.pb` | `fetch` | Récupération de pages web, conversion HTML → Markdown |
 | **MCP-SequentialThinking-PB** | `src/MCP-SequentialThinking-PB.pb` | `sequential_thinking` | Raisonnement séquentiel structuré (étapes, révisions, branches) |
 | **memoryMCP** | `src/memoryMCP.pb` + `src/memory_core.pbi` | 9 outils | Graphe d'entites persistant en SQLite (`MCP_MEMORY_DB`) : entites, observations, relations |
-| **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) + PostgreSQL optionnel (`MCP_DB_POSTGRES_DSN`) |
+| **dbMCP** | `src/dbMCP.pb` + `src/db_core.pbi` | 5 outils | Exploration SQL en lecture seule : SQLite (`MCP_DB_PATH`) ou PostgreSQL (`MCP_DB_POSTGRES_DSN` ; un seul moteur par processus, choisi au demarrage) |
 | **context7MCP** | `src/context7MCP.pb` + `src/context7_core.pbi` | 2 outils | Résolution de bibliothèques et documentation via l'API [Context7](https://context7.com) |
 | **gitMCP** | `src/gitMCP.pb` + `src/git_core.pbi` | 7 outils | Exploration de dépôts git locaux (status, log, diff, show, branches, blame) |
 | **githubMCP** | `src/githubMCP.pb` + `src/github_core.pbi` | 10 outils | API REST GitHub : repos, issues, pull requests, commits, recherches |
@@ -80,6 +80,7 @@ La base est un fichier SQLite créé automatiquement (chemin : `MCP_MEMORY_DB`, 
 | `db_explain` | Plan d'exécution (`EXPLAIN QUERY PLAN` / `EXPLAIN`) | `query`, `engine` |
 
 Garde-fou lecture seule : seuls `SELECT`/`WITH` (sans verbe d'écriture)/`SHOW`/`EXPLAIN`/`DESCRIBE` passent ; toute écriture exige `MCP_DB_ALLOW_WRITE=1` et est journalisée sur stderr en cas de refus. La connexion PostgreSQL impose `statement_timeout=30s`. Les résultats JSON préservent les NULL (`CheckDatabaseNull`) et typent entiers/flottants.
+Requetes multi-instructions refusees : tout point-virgule hors litteraux et commentaires entraine un refus (le controle de lecture seule ne porte que sur le premier verbe ; preuve : `SELECT 1; DROP TABLE x;` executait le DROP sur PostgreSQL). Mode moteur exclusif : si `MCP_DB_POSTGRES_DSN` est defini, le serveur tourne en PostgreSQL exclusif et refuse de demarrer si la connexion echoue ; sinon il tourne en SQLite, comportement par defaut inchange.
 
 ### context7MCP — documentation de bibliothèques (Context7)
 
@@ -190,10 +191,10 @@ run_all.bat        # ou ./run_all.sh : tout verifier
 
 - **Unitaires (PureBasic)** : `tests/unit_test.pbi` (micro-framework) +
   6 suites (`tests/test_common.pb` 42, `test_memory.pb` 33, `test_database.pb`
-  37, `test_context7.pb` 19, `test_git.pb` 24, `test_github.pb` 40 — soit
-  195 tests/hors réseau). Chaque futur module ajoute un `tests/test_<module>.pb`.
+  42, `test_context7.pb` 19, `test_git.pb` 24, `test_github.pb` 40 — soit
+  200 tests/hors réseau). Chaque futur module ajoute un `tests/test_<module>.pb`.
 - **Integration (Python)** : `tests/mcp_client.py` (harnais client MCP avec
-  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (121 tests qui
+  validation de conformite JSON-RPC 2.0) + `tests/test_mcp.py` (122 tests qui
   exercent les outils et les cas de securite de chaque serveur) :
 
 ```bash
@@ -201,7 +202,7 @@ python tests/test_mcp.py                          # les 8 serveurs
 python tests/test_mcp.py memoryMCP                  # un seul serveur
 ```
 
-121 tests au total (PostgreSQL conditionnel, Context7 live hors ligne,
+122 tests au total (PostgreSQL conditionnel, Context7 live hors ligne,
 GitHub via mock local). Validés sous **Windows et Linux (WSL2)**.
 
 - **Robustesse et performances (Phase 6)** : `tests/test_robustness.py` —
@@ -307,11 +308,11 @@ run_all.bat / run_all.sh    # Compilation + tests unitaires + integration + rapp
 tests/
 ├── mcp_client.py           # Harnais de test externe (client MCP Python)
 ├── mock_github.py          # Mock local de l'API GitHub (integration)
-├── test_mcp.py             # Tests fonctionnels des 8 serveurs (121 tests)
+├── test_mcp.py             # Tests fonctionnels des 8 serveurs (122 tests)
 ├── unit_test.pbi           # Micro-framework de tests unitaires PureBasic
 ├── test_common.pb          # Tests unitaires des modules mcp_common (42 tests)
 ├── test_memory.pb          # Tests unitaires du serveur Memory (33 tests)
-├── test_database.pb        # Tests unitaires du serveur Database (37 tests)
+├── test_database.pb        # Tests unitaires du serveur Database (42 tests)
 ├── test_context7.pb        # Tests unitaires du serveur Context7 (19 tests)
 ├── test_git.pb             # Tests unitaires du serveur Git (24 tests)
 ├── test_github.pb          # Tests unitaires du serveur GitHub (40 tests)

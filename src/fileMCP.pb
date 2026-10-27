@@ -9,6 +9,37 @@
 
 EnableExplicit
 
+CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+  ; Resolution des junctions/liens symboliques (anti-evasion de MCP_ROOT)
+  #FILE_ATTRIBUTE_REPARSE_POINT = $00000400
+  #IO_REPARSE_TAG_MOUNT_POINT   = $A0000003
+  #IO_REPARSE_TAG_SYMLINK       = $A000000C
+  #SYMBOLIC_LINK_FLAG_DIRECTORY = $00000001
+
+  PrototypeC pfCreateFileW(lpFileName.s, dwDesiredAccess.l, dwShareMode.l,
+                           lpSecurityAttributes.i, dwCreationDisposition.l,
+                           dwFlagsAndAttributes.l, hTemplateFile.i)
+  PrototypeC pfDeviceIoControl(hObject.i, dwIoControlCode.l, lpInBuffer.i,
+                               nInBufferSize.l, lpOutBuffer.i, nOutBufferSize.l,
+                               *lpBytesReturned, lpOverlapped.i)
+  PrototypeC pfCloseHandle(hObject.i)
+  PrototypeC.l pfGetFileAttributesW(lpFileName.s)
+
+  Global mfpCreateFile.pfCreateFileW
+  Global mfpDeviceIoControl.pfDeviceIoControl
+  Global mfpCloseHandle.pfCloseHandle
+  Global mfpGetFileAttributes.pfGetFileAttributesW
+  #MFP_INVALID_FILE_ATTRIBUTES = -1
+
+  #MFP_GENERIC_READ             = $80000000
+  #MFP_FILE_FLAG_BACKUP_SEMANTICS = $02000000
+  #MFP_FILE_FLAG_OPEN_REPARSE_POINT = $00200000
+  #MFP_OPEN_EXISTING            = 3
+  #MFP_INVALID_HANDLE           = -1
+  #MFP_FSCTL_GET_REPARSE_POINT  = $000900A8
+  #MFP_MAX_REPARSE              = 16384
+CompilerEndIf
+
 IncludeFile "../mcp_common/stdio.pbi"
 IncludeFile "../mcp_common/logging.pbi"
 IncludeFile "../mcp_common/json_helpers.pbi"
@@ -122,6 +153,154 @@ Procedure.i NativeCreateDirectories(Path.s)
   ProcedureReturn Bool(FileSize(Path) = -2)
 EndProcedure
 
+; ---------------------------------------------------------------------------
+; Resolution des junctions / liens symboliques (anti-evasion)
+; ---------------------------------------------------------------------------
+; Le confinement par prefixe ne suffit pas : un lien cree DANS la racine et
+; pointant HORS de la racine passe le controle lexical. On resout donc chaque
+; segment du chemin et on refuse (fail-closed) tout lien non resolvable ou
+; toute cible qui quitte la racine autorisee.
+
+CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+
+Procedure.i MfpResolveInit()
+  Static Done.i = 0
+  If Done : ProcedureReturn #True : EndIf
+  Protected K.i = OpenLibrary(#PB_Any, "kernel32.dll")
+  If K = 0 : ProcedureReturn #False : EndIf
+  mfpCreateFile    = GetFunction(K, "CreateFileW")
+  mfpDeviceIoControl = GetFunction(K, "DeviceIoControl")
+  mfpCloseHandle   = GetFunction(K, "CloseHandle")
+  mfpGetFileAttributes = GetFunction(K, "GetFileAttributesW")
+  If mfpCreateFile = 0 Or mfpDeviceIoControl = 0 Or mfpCloseHandle = 0 Or mfpGetFileAttributes = 0
+    ProcedureReturn #False
+  EndIf
+  Done = #True
+  ProcedureReturn #True
+EndProcedure
+
+Procedure.s MfpReadLink(FilePath.s)
+  If Not MfpResolveInit() : ProcedureReturn "" : EndIf
+
+  Protected h.i = mfpCreateFile(FilePath, #MFP_GENERIC_READ, 7, #Null,
+                                #MFP_OPEN_EXISTING,
+                                #MFP_FILE_FLAG_BACKUP_SEMANTICS | #MFP_FILE_FLAG_OPEN_REPARSE_POINT,
+                                #Null)
+  If h = #MFP_INVALID_HANDLE : ProcedureReturn "" : EndIf
+
+  Protected *Buf = AllocateMemory(#MFP_MAX_REPARSE)
+  Protected Returned.l = 0
+  Protected Target.s = ""
+  If *Buf
+    ; Layout empirique (harnais reparse_debug) :
+    ; DWORD tag ; WORD w4 ; WORD w6 ; WORD subOff ; WORD subLen ;
+    ; WORD printOff ; WORD printLen ; donnees a partir de +16.
+    If mfpDeviceIoControl(h, #MFP_FSCTL_GET_REPARSE_POINT, #Null, 0,
+                          *Buf, #MFP_MAX_REPARSE, @Returned, #Null)
+      ; Champs communs : Tag(+0) ; subOff(+8) subLen(+10) printOff(+12)
+      ; printLen(+14). La zone de noms commence a +16 pour une junction
+      ; (MOUNT_POINT) mais a +20 pour un symlink (Flags DWORD en +16).
+      Protected TagL.l = PeekL(*Buf)
+      Protected Base.i = 16
+      If TagL = #IO_REPARSE_TAG_SYMLINK : Base = 20 : EndIf
+      Protected SubOff.w = PeekW(*Buf + 8)
+      Protected SubLen.w = PeekW(*Buf + 10)
+      Protected PrintOff.w = PeekW(*Buf + 12)
+      Protected PrintLen.w = PeekW(*Buf + 14)
+      If SubLen > 0
+        Target = PeekS(*Buf + Base + SubOff, SubLen / 2, #PB_Unicode)
+      ElseIf PrintLen > 0
+        Target = PeekS(*Buf + Base + PrintOff, PrintLen / 2, #PB_Unicode)
+      EndIf
+      If Left(Target, 4) = "\??\"
+        Target = Mid(Target, 5)
+      EndIf
+    EndIf
+    FreeMemory(*Buf)
+  EndIf
+  mfpCloseHandle(h)
+
+  If Target = "" : ProcedureReturn "" : EndIf
+  ; Secours : si la chaine semble degradee, on cherche le motif "<lettre>:\"
+  ; et on coupe juste avant (les buffers reparse sont parfois decales).
+  If Mid(Target, 2, 1) <> ":"
+    Protected C.i = FindString(Target, ":\")
+    If C >= 2
+      ProcedureReturn Mid(Target, C - 1)
+    EndIf
+    ProcedureReturn ""   ; pas de cible locale exploitable : refuse
+  EndIf
+  ProcedureReturn Target
+EndProcedure
+
+; Le chemin designe-t-il un reparse point (junction/symlink) ?
+Procedure.i MfpIsReparse(Path.s)
+  If Not MfpResolveInit() : ProcedureReturn #False : EndIf
+  Protected Attr.l = mfpGetFileAttributes(Path)
+  If Attr = #MFP_INVALID_FILE_ATTRIBUTES : ProcedureReturn #False : EndIf
+  ProcedureReturn Bool(Attr & #FILE_ATTRIBUTE_REPARSE_POINT)
+EndProcedure
+
+; Resout tous les liens du chemin (dossiers intermediaires et cible finale).
+; Retourne le chemin reel, ou "" si un lien est non resolvable (fail-closed).
+; MaxDepth borne les resolutions successives (anti-boucle de liens croises).
+Procedure.s MfpRealPath(Path.s, MaxDepth.i)
+  Protected Sep.s = GetPathSeparator()
+  Protected Current.s = NormalizePath(Path)
+  Protected Guard.i = 0
+
+  While Guard < MaxDepth
+    Guard + 1
+
+    ; Trouver le premier reparse point en scannant les prefixes. Le disque
+    ; ("C:") n'est jamais un reparse ; on scanne chaque position de
+    ; separateur, puis le chemin complet (cas d'un fichier-lien).
+    Protected Pos.i = 0
+    Protected Found.s = ""
+    Protected FoundEnd.i = 0
+    While Pos < Len(Current)
+      Pos = FindString(Current, Sep, Pos + 1)
+      If Pos = 0 : Break : EndIf
+      Protected Candidate.s = Left(Current, Pos - 1)
+      If Len(Candidate) > 3 And MfpIsReparse(Candidate)
+        Found = Candidate
+        FoundEnd = Pos
+        Break
+      EndIf
+    Wend
+    ; la racine du chemin (si plus longue qu'un simple "C:") peut elle-meme
+    ; etre une junction : verifier aussi le prefixe jusqu'au 1er separateur.
+    Protected FirstSep.i = FindString(Current, Sep, 1)
+    If Found = "" And FirstSep > 4
+      Protected HeadPart.s = Left(Current, FirstSep - 1)
+      If MfpIsReparse(HeadPart)
+        Found = HeadPart
+        FoundEnd = FirstSep
+      EndIf
+    EndIf
+    If Found = "" And Current <> "" And Right(Current, 1) <> Sep
+      If MfpIsReparse(Current)
+        Found = Current
+        FoundEnd = Len(Current) + 1
+      EndIf
+    EndIf
+    If Found = "" : Break : EndIf
+
+    Protected Tgt.s = MfpReadLink(Found)
+    If Tgt = "" : ProcedureReturn "" : EndIf
+
+    If FoundEnd <= Len(Current)
+      Current = NormalizePath(Tgt + Mid(Current, FoundEnd))
+    Else
+      Current = NormalizePath(Tgt)
+    EndIf
+  Wend
+
+  ProcedureReturn Current
+EndProcedure
+
+CompilerEndIf
+
 Procedure.s ValiderChemin(CheminDemande.s)
   CheminDemande = Trim(CheminDemande)
   If CheminDemande = ""
@@ -146,23 +325,41 @@ Procedure.s ValiderChemin(CheminDemande.s)
     FullPath = NormalizePath(CheminDemande)
   EndIf
 
+  ; Anti-evasion : resoudre les junctions/liens symboliques AVANT le
+  ; controle de confinement. Un lien non resolvable => refus (fail-closed).
+  Protected RealPath.s = FullPath
+  CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+    RealPath = MfpRealPath(FullPath, 24)
+    If RealPath = "" : ProcedureReturn "" : EndIf
+  CompilerEndIf
+
   Protected FullRoot.s = EnsureTrailingSlash(NormalizePath(G_AllowedRoot))
+  Protected RealRoot.s = FullRoot
+  CompilerIf #PB_Compiler_OS = #PB_OS_Windows
+    RealRoot = MfpRealPath(FullRoot, 24)
+    If RealRoot = "" : ProcedureReturn "" : EndIf
+    RealRoot = EnsureTrailingSlash(NormalizePath(RealRoot))
+  CompilerEndIf
+
   Protected NormPath.s, NormRoot.s
 
   CompilerIf #PB_Compiler_OS = #PB_OS_Windows
-    NormPath = UCase(EnsureTrailingSlash(FullPath))
-    NormRoot = UCase(FullRoot)
+    NormPath = UCase(EnsureTrailingSlash(RealPath))
+    NormRoot = UCase(RealRoot)
   CompilerElse
+    ; Linux/macOS : FileSize() suit deja les symlinks ; le controle lexical
+    ; suffit car un symlink hors racine ne peut etre atteint qu'en traversant
+    ; un chemin qui, resolu, sort du prefixe.
     NormPath = EnsureTrailingSlash(FullPath)
     NormRoot = FullRoot
   CompilerEndIf
 
-  ; Confinement sous la racine autorisee
+  ; Confinement sous la racine autorisee (chemin RESOLU)
   If Left(NormPath, Len(NormRoot)) <> NormRoot
     ProcedureReturn ""
   EndIf
 
-  ProcedureReturn FullPath
+  ProcedureReturn RealPath
 EndProcedure
 
 Procedure.i IsBinaryFile(Filename.s)

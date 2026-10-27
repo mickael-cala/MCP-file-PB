@@ -129,6 +129,28 @@ Procedure Test_ExplainAndEngine()
 EndProcedure
 
 ; ===========================================================================
+; B.2 : requetes multi-instructions refusees (garde lecture seule)
+; ===========================================================================
+Procedure Test_MultiStatementGuard()
+  SendStderrLine("--- T2.13 multi-instructions refusees ---")
+
+  Protected Out.s = ToolDbExecuteQuery("sqlite", "SELECT 1; DROP TABLE users;")
+  UTAssert(1, Bool(Left(Out, 6) = "Erreur"), "T2.13a SELECT+DROP refuse")
+
+  Out = ToolDbExecuteQuery("sqlite", "SELECT 1; DELETE FROM users;")
+  UTAssert(1, Bool(Left(Out, 6) = "Erreur"), "T2.13b SELECT+DELETE refuse")
+
+  Out = ToolDbExecuteQuery("sqlite", "SELECT ';' AS semi")
+  UTAssert(1, Bool(FindString(Out, "Erreur") = 0), "T2.13c point-virgule dans litteral accepte")
+
+  Out = ToolDbExecuteQuery("sqlite", "SELECT 1 -- commentaire; final")
+  UTAssert(1, Bool(FindString(Out, "Erreur") = 0), "T2.13d point-virgule dans commentaire accepte")
+
+  Out = ToolDbExecuteQuery("sqlite", "SELECT COUNT(*) FROM users")
+  UTAssert(1, Bool(FindString(Out, "Erreur") = 0), "T2.13e serveur vivant apres refus")
+EndProcedure
+
+; ===========================================================================
 ; Programme principal
 ; ===========================================================================
 If Not CheckStdio()
@@ -148,6 +170,7 @@ Test_ListAndDescribe()
 Test_ExecuteQuery()
 Test_ErrorsAndEscaping()
 Test_ExplainAndEngine()
+Test_MultiStatementGuard()
 
 DbClose()
 DeleteFile(G_TestDB)

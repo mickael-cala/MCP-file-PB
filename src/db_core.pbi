@@ -13,6 +13,7 @@
 Global G_DBSQLite.i = 0
 Global G_DBPostgres.i = 0
 Global G_DBPG_DSN.s = ""
+Global G_DriverSQLReady.i = 0
 Global G_DBAllowWrite.i = #False
 #DB_MAX_ROWS = 1000
 
@@ -31,13 +32,86 @@ Procedure.i DbOpenSQLite(Path.s)
   ProcedureReturn Bool(G_DBSQLite <> 0)
 EndProcedure
 
+; Extrait la valeur d'un mot-clef du DSN style libpq (host=... user=...).
+; Valeurs entre apostrophes supportees (les apostrophes sont retirees).
+Procedure.s DbDsnValue(DSN.s, Key.s)
+  Protected Pos.i = 1
+  Protected Pat.s = Key + "="
+  While #True
+    Pos = FindString(DSN, Pat, Pos)
+    If Pos = 0 : ProcedureReturn "" : EndIf
+    ; mot-clef entier : le caractere precedent doit etre un espace ou debut
+    If Pos = 1 Or Mid(DSN, Pos - 1, 1) = " "
+      Protected Rest.s = Mid(DSN, Pos + Len(Pat))
+      If Left(Rest, 1) = "'"
+        Rest = Mid(Rest, 2)
+        Protected EndQ.i = FindString(Rest, "'")
+        If EndQ > 0 : ProcedureReturn Left(Rest, EndQ - 1) : EndIf
+        ProcedureReturn Rest
+      EndIf
+      Protected EndSp.i = FindString(Rest, " ")
+      If EndSp = 0 : ProcedureReturn Rest : EndIf
+      ProcedureReturn Left(Rest, EndSp - 1)
+    EndIf
+    Pos + Len(Pat)
+  Wend
+EndProcedure
+
+; Retire user/password du DSN (PureBasic les prend en parametres separes).
+Procedure.s DbDsnWithoutCredentials(DSN.s)
+  Protected Out.s = Trim(DSN)
+  Protected k.i, Pos.i, Part.s
+  ; suppression grossiere : reconstruire sans les mots-clefs user/password
+  Protected Fields.s = ""
+  Protected n.i = CountString(Out, " ") + 1
+  Protected i.i
+  Protected InQuotes.i = #False
+  Protected Token.s = ""
+  For i = 1 To Len(Out)
+    Protected Ch.s = Mid(Out, i, 1)
+    If Ch = "'"
+      InQuotes = 1 - InQuotes
+      Token + Ch
+    ElseIf Ch = " " And InQuotes = 0
+      Fields + Token + #LF$
+      Token = ""
+    Else
+      Token + Ch
+    EndIf
+  Next
+  Fields + Token
+  Protected Kept.s = ""
+  For i = 1 To CountString(Fields, #LF$) + 1
+    Part = Trim(StringField(Fields, i, #LF$))
+    If Part = "" : Continue : EndIf
+    Protected Key.s = LCase(StringField(Part, 1, "="))
+    If Key = "user" Or Key = "password" : Continue : EndIf
+    Kept + Part + " "
+  Next
+  ProcedureReturn Trim(Kept)
+EndProcedure
+
 Procedure.i DbOpenPostgres(DSN.s)
+  ; IMPORTANT : UsePostgreSQLDatabase() DOIT etre rappele juste avant
+  ; l'ouverture. Le UseSQLiteDatabase() de DbOpenSQLite bascule le driver
+  ; actif et OpenDatabase utilisera sinon SQLite pour le DSN PG (echec
+  ; silencieux, handle 0, DatabaseError vide).
   UsePostgreSQLDatabase()
   ; statement_timeout 30 s a la connexion (plancher de securite)
   If FindString(DSN, "statement_timeout") = 0
     DSN + " options='-c statement_timeout=30000'"
   EndIf
-  G_DBPostgres = OpenDatabase(#PB_Any, DSN, "", "")
+  ; PureBasic : user/password sont des parametres SEPARES d'OpenDatabase.
+  ; Un DSN contenant user=/password= est rejete par libpq ("invalid
+  ; connection option"). On les extrait puis on les retire du DSN.
+  Protected User.s = DbDsnValue(DSN, "user")
+  Protected Pass.s = DbDsnValue(DSN, "password")
+  Protected Clean.s = DbDsnWithoutCredentials(DSN)
+  If User = ""
+    G_DBPostgres = OpenDatabase(#PB_Any, Clean, "", "")
+  Else
+    G_DBPostgres = OpenDatabase(#PB_Any, Clean, User, Pass)
+  EndIf
   If G_DBPostgres = 0
     ProcedureReturn #False
   EndIf
@@ -53,6 +127,57 @@ EndProcedure
 ; ---------------------------------------------------------------------------
 ; Garde-fou lecture seule
 ; ---------------------------------------------------------------------------
+
+; Contient-il un separateur d'instructions (';') hors littéraux et hors
+; commentaires ? Si oui, la requete est multi-instructions : refusee
+; (IsReadOnlyQuery ne valide que le premier verbe ; le driver PB transmet
+; la chaine entiere a PostgreSQL qui execute TOUT — preuve : un
+; 'SELECT 1; DROP TABLE x;' detruisait la table).
+Procedure.i HasStatementSeparator(Query.s)
+  Protected InSingle.i = #False
+  Protected InDouble.i = #False
+  Protected i.i, Ch.s, NextCh.s
+  Protected Len.i = Len(Query)
+  i = 1
+  While i <= Len
+    Ch = Mid(Query, i, 1)
+    If InSingle
+      If Ch = "'"
+        If i < Len And Mid(Query, i + 1, 1) = "'"
+          i + 1
+        Else
+          InSingle = #False
+        EndIf
+      EndIf
+    ElseIf InDouble
+      If Ch = Chr(34)
+        InDouble = #False
+      EndIf
+    ElseIf Ch = "'"
+      InSingle = #True
+    ElseIf Ch = Chr(34)
+      InDouble = #True
+    ElseIf Ch = "-"
+      If i < Len And Mid(Query, i + 1, 1) = "-"
+        ; commentaire de ligne : jusqu'a la fin
+        ProcedureReturn #False
+      EndIf
+    ElseIf Ch = "/"
+      If i < Len And Mid(Query, i + 1, 1) = "*"
+        Protected EndC.i = FindString(Query, "*/", i + 2)
+        If EndC = 0
+          ProcedureReturn #False
+        EndIf
+        i = EndC + 1
+      EndIf
+    ElseIf Ch = ";"
+      ; separateur hors litteraux/commentaires
+      ProcedureReturn #True
+    EndIf
+    i + 1
+  Wend
+  ProcedureReturn #False
+EndProcedure
 
 ; Normalise une requete (supprime les commentaires de tete) et verifie
 ; qu'elle est en lecture seule. Whitelist : SELECT / SHOW / EXPLAIN /
@@ -199,6 +324,10 @@ EndProcedure
 Procedure.s DbExecuteGuarded(DB.i, Query.s)
   If Trim(Query) = ""
     ProcedureReturn ToolFail("Erreur : requete vide.")
+  EndIf
+  If HasStatementSeparator(Query)
+    LogError("Requete refusee (multi-instructions) : " + Left(Query, 120))
+    ProcedureReturn "Erreur : requetes multi-instructions refusees (controle de lecture seule impossible)."
   EndIf
   If Not G_DBAllowWrite And Not IsReadOnlyQuery(Query)
     LogError("Requete refusee (lecture seule) : " + Left(Query, 120))

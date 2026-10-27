@@ -55,6 +55,29 @@ Ce projet suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le [v
   **WSL2 Ubuntu 26.04** (PureBasic 6.41 Linux x64) — `run_all` **10/10**,
   **195** tests unitaires, **17/17** robustesse/perf, **121/121** intégration.
 
+### Corrigé (durcissement PostgreSQL — B.2)
+
+- **`dbMCP` : requêtes multi-instructions refusées** (`HasStatementSeparator`,
+  point-virgule hors littéraux et commentaires). Preuve d'exploit reproduite
+  avant correction : `SELECT 1; DROP TABLE guard;` passait le garde
+  `IsReadOnlyQuery` (qui ne valide que le premier verbe) et le driver PB
+  transmettait la chaîne entière à PostgreSQL qui exécutait **tout** — la
+  table de test était réellement détruite. Le garde s'applique aux deux
+  moteurs (tests T2.13a–e SQLite, T2.13f PostgreSQL).
+- **`dbMCP` : connexion PostgreSQL réparée** — PureBasic attend user/password
+  en paramètres **séparés** d'`OpenDatabase` ; un DSN contenant `user=/password=`
+  était rejeté par libpq. Le DSN est désormais parsé
+  (`DbDsnValue`/`DbDsnWithoutCredentials`).
+- **`dbMCP` : moteur exclusif au démarrage** — PureBasic 6.41 ne supporte pas
+  l'alternance fiable SQLite/PostgreSQL dans un même processus (le dernier
+  `Use*` gagne, l'autre moteur échoue silencieusement). Avec
+  `MCP_DB_POSTGRES_DSN` défini, le serveur tourne **en mode PostgreSQL
+  exclusif** et refuse de démarrer si la connexion échoue ; sans DSN,
+  comportement SQLite inchangé.
+- **Tests** : T2.13a–e (garde multi-instructions SQLite), T2.13f (PostgreSQL),
+  T2.11 réécrit (DSN invalide → arrêt propre avec message). Compteur :
+  **200 tests unitaires**.
+
 ### Corrigé (validation Linux/WSL2)
 - **`build.sh` / `run_all.sh`** utilisaient les options Windows (`/EXE`,
   `/CONSOLE`, `/UNICODE`) : remplacées par les options Linux/macOS

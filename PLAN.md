@@ -11,14 +11,14 @@
 | **4** | Git | ✅ Terminée | `gitMCP` (7 outils, validation anti-injection), 24 tests unitaires, 12 tests d'intégration |
 | **5** | GitHub | ✅ Terminée | `githubMCP` (10 outils, `confirm=true`, mock local), 40 tests unitaires, 25 tests d'intégration |
 | **6** | Consolidation et tests transverses | ✅ Terminée | `tests/test_robustness.py` (17 vérifications T6.1–T6.14), rapport HTML par serveur, `examples/mcp.json` |
-| **7** | Durcissement (suite à audit) | ✅ Terminée | Anti-SSRF par résolution DNS (`net_guard.pbi`), redirections bornées et revalidées, `delete_file` non récursif par défaut, refus des binaires en lecture, `isError` explicite (`ToolOk`/`ToolFail`), conformité JSON-RPC (notifications, -32601, -32602), tests de non-régression |
+| **7** | Durcissement (suite à audit) | ✅ Terminée | Anti-SSRF par résolution DNS (`net_guard.pbi`), redirections bornées et revalidées, `delete_file` non récursif par défaut, refus des binaires en lecture, `isError` explicite (`ToolOk`/`ToolFail`), conformité JSON-RPC (notifications, -32601, -32602), tests de non-régression ; **B.2** : `dbMCP` garde multi-instructions + connexion PostgreSQL réparée + moteur exclusif au démarrage |
 
 ## Définition de « terminé » (état actuel)
 
 | Critère | État |
 |---|---|
-| Tests unitaires des modules et serveurs | ✅ 42 + 33 + 37 + 19 + 24 + 40 = **195** (Windows et Linux) |
-| Tests d'intégration (8 serveurs) | ✅ **121/121** |
+| Tests unitaires des modules et serveurs | ✅ 42 + 33 + 42 + 19 + 24 + 40 = **200** (Windows et Linux) |
+| Tests d'intégration (8 serveurs) | ✅ **122/122** (124 avec PostgreSQL) |
 | `run_all.bat` / `run_all.sh` vert | ✅ **10/10 étapes** |
 | Erreurs MCP en `isError: true` avec message clair | ✅ état explicite `ToolOk`/`ToolFail` + heuristique de premier recours limitée à la première ligne |
 | Aucun secret loggé ni renvoyé | ✅ tokens/clés jamais inclus dans les réponses ; logs stderr |
@@ -37,12 +37,12 @@
 | `MCP-Fetch-PB` | 1 | — (intégration) | 8 | README |
 | `MCP-SequentialThinking-PB` | 1 | — (intégration) | 6 | README |
 | `memoryMCP` | 9 | 33 | 20 | README, SECURITY, ERRATA |
-| `dbMCP` | 5 | 37 | 12 | README, SECURITY, ERRATA |
+| `dbMCP` | 5 | 42 | 13 | README, SECURITY, ERRATA |
 | `context7MCP` | 2 | 19 | 7 | README, SECURITY, ERRATA |
 | `gitMCP` | 7 | 24 | 12 | README, SECURITY, ERRATA |
 | `githubMCP` | 10 | 40 | 25 | README, SECURITY, ERRATA |
 
-Total : **45 outils**, **195 tests unitaires**, **121 tests d'intégration**.
+Total : **45 outils**, **200 tests unitaires**, **122 tests d'intégration**.
 Les serveurs sans `*_core.pbi` (Fetch, SequentialThinking) sont couverts par
 l'intégration, sans suite unitaire dédiée.
 

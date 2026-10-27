@@ -22,6 +22,7 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -369,6 +370,11 @@ def run_checks_database_postgres(base_env):
     with MCPTestClient(find_binary("dbMCP"), env=env) as client:
         err, text = client.tool_text("db_list_schemas", {"engine": "postgres"})
         check("T2.9 list_schemas retourne public", not err and "public" in text, text[:120])
+        err, text = client.tool_text("db_execute_query", {
+            "engine": "postgres",
+            "query": "SELECT 1; DROP TABLE IF EXISTS mcp_b2_probe;",
+        })
+        check("T2.13f multi-instructions refusees (postgres)", err and "multi-instructions" in text, text[:160])
         err, text = client.tool_text("db_list_tables", {"engine": "postgres"})
         check("T2.9b list_tables postgres ok", not err, text[:120])
         err, text = client.tool_text("db_execute_query", {
@@ -376,12 +382,21 @@ def run_checks_database_postgres(base_env):
             "query": "SELECT table_name FROM information_schema.tables WHERE table_schema='public' LIMIT 1",
         })
         check("T2.12 requete information_schema ok", not err, text[:120])
-    # Connexion invalide : le serveur doit demarrer quand meme et rejeter proprement
+    # Connexion invalide : en mode moteur exclusif, le serveur refuse de
+    # demarrer (exit != 0) avec un message clair sur stderr — comportement
+    # documente depuis le durcissement multi-moteurs.
     bad_env = dict(base_env)
     bad_env["MCP_DB_POSTGRES_DSN"] = "host=127.0.0.1 port=9 dbname=rien connect_timeout=2"
-    with MCPTestClient(find_binary("dbMCP"), env=bad_env) as client:
-        err, text = client.tool_text("db_list_schemas", {"engine": "postgres"})
-        check("T2.11 connexion postgres invalide -> erreur claire, serveur vivant", err, text[:120])
+    proc = subprocess.run(
+        [str(find_binary("dbMCP"))],
+        input="",
+        capture_output=True, text=True, timeout=30, env={**os.environ, **bad_env},
+    )
+    check(
+        "T2.11 connexion postgres invalide -> arret clair (exit!=0, message)",
+        proc.returncode != 0 and "PostgreSQL" in (proc.stderr or ""),
+        f"rc={proc.returncode} stderr={ (proc.stderr or '')[:120] }",
+    )
 
 
 def run_checks_database(client):

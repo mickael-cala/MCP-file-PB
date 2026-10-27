@@ -8,7 +8,7 @@
 | `MCP-Fetch-PB` | conversion HTML→Markdown basique ; pas de JS ; hôtes privés refusés après résolution DNS ; `curl` requis hors Windows ; 3 redirections maximum |
 | `MCP-SequentialThinking-PB` | état en mémoire (perdu à l'arrêt) ; pas de persistance |
 | `memoryMCP` | une instance écrit à la fois (SQLite, pas de WAL) ; pas de FTS |
-| `dbMCP` | lecture seule par défaut ; PostgreSQL sans binding de paramètres |
+| `dbMCP` | lecture seule par défaut ; PostgreSQL sans binding de paramètres ; un seul moteur par processus (SQLite **ou** PostgreSQL, choisi au démarrage par `MCP_DB_POSTGRES_DSN`) ; requêtes multi-instructions refusées |
 | `context7MCP` | `query_docs` exige une clé ; hors ligne → erreur explicite |
 | `gitMCP` | sous-processus git requis ; sortie plafonnée à 40 Ko |
 | `githubMCP` | token requis ; écritures via `confirm=true` ; pagination manuelle |
@@ -45,9 +45,9 @@
 
 Dernière exécution de `run_all.bat` (Windows) et `./run_all.sh`
 (WSL2 Ubuntu 26.04, PureBasic 6.41 Linux x64) : **10/10 étapes** — tests unitaires
-42 + 33 + 37 + 19 + 24 + 40 réussis (mcp_common, Memory, Database, Context7,
+42 + 33 + 42 + 19 + 24 + 40 réussis (mcp_common, Memory, Database, Context7,
 Git, GitHub), robustesse/performance **17/17**, tests d'intégration
-**121/121** (8 serveurs ; PostgreSQL et Context7 live sont ignorés sans
+**122/122** (8 serveurs ; PostgreSQL et Context7 live sont ignorés sans
 configuration/réseau, GitHub utilise un mock local).
 
 ## Comportements documentés (Phase 6)

@@ -20,8 +20,8 @@ travaillent sur ce dépôt. **À lire en premier à chaque reprise.**
    build.bat                  # ou ./build.sh : compile les 8 serveurs
    run_all.bat                # ou ./run_all.sh : unitaires + intégration + rapport
    ```
-   Attendu : **10/10 étapes**, **195 tests unitaires** (42+33+37+19+24+40),
-   **17/17 robustesse/performance** et **121/121 tests d'intégration**. Si ce n'est pas le cas, corriger avant
+   Attendu : **10/10 étapes**, **200 tests unitaires** (42+33+42+19+24+40),
+   **17/17 robustesse/performance** et **122/122 tests d'intégration**. Si ce n'est pas le cas, corriger avant
    toute nouvelle fonctionnalité.
 4. **Choisir la suite** : voir [ROADMAP.md](ROADMAP.md). Ne jamais démarrer
    une phase sans avoir vert `run_all`.
@@ -36,7 +36,7 @@ export PBCOMPILER=$HOME/purebasic-demo/purebasic_demo/compilers/pbcompiler
 export PUREBASIC_HOME=$HOME/purebasic-demo/purebasic_demo
 ./build.sh && ./run_all.sh
 ```
-Attendu : 10/10 étapes (195 unitaires, 17 robustesse/perf, 121 intégration).
+Attendu : 10/10 étapes (200 unitaires, 17 robustesse/perf, 122 intégration).
 Attention : `build/` est partagé avec Windows si le dépôt est sur `/mnt/c` —
 relancer `build.bat` après une validation Linux.
 
@@ -108,7 +108,7 @@ build.bat              # Windows : compile les 8 serveurs -> build\*.exe
 ./build.sh             # Linux/macOS : compile les 8 serveurs -> build/
 run_all.bat            # compilation + 6 suites unitaires + robustesse/perf + intégration + report.html
 ./run_all.sh           # idem sous Linux/macOS
-python tests/test_mcp.py [serveur]   # intégration seule (121 tests)
+python tests/test_mcp.py [serveur]   # intégration seule (122 tests)
 ./clean.sh             # nettoie build/
 ```
 
@@ -196,6 +196,12 @@ Puis : renseigner `G_ServerName`/`G_ServerVersion`, affecter
   (fichier de configuration, pas de quoting shell).
 - **RunProgram sous Linux** ne gère pas les guillemets dans les arguments :
   écrire un script temporaire (`git_core.pbi` le fait) ou passer par curl -K.
+- **Multi-moteurs Database** : un seul `Use*Database()` par processus de
+  fiable. `UsePostgreSQLDatabase()` doit etre appele au CHARGEMENT de dbMCP
+  (et non dans une procedure apres une ouverture SQLite) ; sinon
+  `OpenDatabase` PG echoue silencieusement (handle 0, erreur vide).
+  `DbOpenSQLite` rapelle `UseSQLiteDatabase()` avant son open : le dernier
+  Use* defini le driver actif.
 - **Fins de ligne** : `.gitattributes` impose LF aux `.sh/.py/.pb/.pbi/.md`
   (un shebang en CRLF casse l'exécution sous WSL) ; `.bat` en CRLF.
 - **IDE/projets** : `.pbi` = module d'inclusion ; un projet IDE est un `.pbp`
@@ -230,7 +236,7 @@ build.bat/build.sh                compilation des 8 serveurs ; clean.* : nettoya
 run_all.bat/run_all.sh            compilation + tests unitaires + integration + rapport
 tests/mcp_client.py               harnais de test externe (client MCP Python)
 tests/mock_github.py              mock local de l'API GitHub
-tests/test_mcp.py                 tests d'integration des 8 serveurs (121 tests)
+tests/test_mcp.py                 tests d'integration des 8 serveurs (122 tests)
 tests/unit_test.pbi               framework de tests unitaires PureBasic
 tests/test_common.pb              tests unitaires mcp_common (24 tests)
 tests/test_memory.pb              tests unitaires Memory (33 tests)
